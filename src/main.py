@@ -11,6 +11,7 @@ from src.agents.coordinator import IncidentCoordinator
 from src.models.incident import ApprovalRequest, ExecutionRequest, HealthVerificationRequest, IncidentAnalysis, IncidentCreate, IncidentResponse, VerificationRequest
 from src.models.events import EventIngestionResponse, NodeHeartbeat, NodeRecord, NormalizedEvent
 from src.models.settings import SettingsResponse, SettingsUpdate
+from src.services.cloud_run_executor import CloudRunExecutionError, rollback_cloud_run
 from src.services.event_bus import EventConsumer, build_event_consumer, build_event_publisher
 from src.services.ingestion import incident_from_event
 from src.services.incident_store import IncidentNotFoundError, build_incident_store
@@ -66,7 +67,7 @@ async def lifespan(_app: FastAPI):
             event_consumer.stop()
 
 
-app = FastAPI(title="SentinelOps", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="SentinelOps", version="0.4.0", lifespan=lifespan)
 register_pubsub_push(app, _handle_external_event)
 
 
@@ -265,14 +266,29 @@ def decide_incident_approval(
 
 @app.post("/incidents/{incident_id}/execute", response_model=IncidentResponse)
 def execute_incident_remediation(incident_id: str, payload: ExecutionRequest, _: None = Depends(require_control_token)) -> IncidentResponse:
+    """Execute one explicit, approved and allowlisted remediation action."""
+
     if not payload.confirm:
         raise HTTPException(status_code=400, detail="Explicit execution confirmation is required")
     try:
-        updated = incident_store.execute(incident_id)
+        incident = incident_store.get(incident_id)
+        if incident.analysis is None or not hasattr(incident.analysis, "remediation_status"):
+            raise ValueError("Incident has no actionable analysis")
+        if incident.analysis.requires_human_approval and incident.approval_status != "approved":
+            raise ValueError("Human approval is required before execution")
+        if incident.analysis.remediation_status == "blocked":
+            raise ValueError("Safety policy blocked this remediation")
+        if incident.analysis.remediation_status == "executed":
+            raise ValueError("Remediation has already been executed")
+
+        detail = rollback_cloud_run(incident.service, payload.target_revision, payload.region)
+        updated = incident_store.execute(incident_id, detail)
         event_publisher.publish("incident.remediation_executed", updated.model_dump(mode="json"))
         return updated
     except IncidentNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Incident not found") from exc
+    except CloudRunExecutionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
