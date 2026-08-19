@@ -33,6 +33,8 @@ gcloud run deploy "$SERVICE" \
   --region "$REGION" \
   --platform managed \
   --allow-unauthenticated \
+  --command "" \
+  --args "" \
   --set-env-vars "DEMO_VERSION=$VERSION,DEMO_BROKEN=$BROKEN" \
   --memory 256Mi \
   --cpu 1 \
