@@ -71,6 +71,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .brand {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -79,7 +80,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .brand-lockup { position: relative; display: block; flex: 1 1 auto; width: auto; max-width: calc(100% - 44px); min-width: 0; height: auto; margin: 0; object-fit: contain; object-position: left center; }
-.sidebar-toggle { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; margin-left: auto; padding: 0; overflow: hidden; border: 0; border-radius: 8px; background: transparent; cursor: pointer; line-height: 0; }
+.sidebar-toggle { position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 32px; height: 32px; margin: 0; padding: 0; overflow: hidden; border: 0; border-radius: 8px; background: transparent; cursor: pointer; line-height: 0; }
 .sidebar-toggle img { display: block; width: 32px; height: 32px; margin: 0; padding: 0; object-fit: contain; object-position: center; }
 .sidebar-toggle:hover { filter: brightness(1.18); }
 .shell.sidebar-collapsed .sidebar { width: 84px; flex-basis: 84px; padding-inline: 13px; }
