@@ -17,7 +17,9 @@ if ($Apply -and -not (Get-Command gcloud -ErrorAction SilentlyContinue)) {
 $serviceAccountEmail = "$ServiceAccount@$ProjectId.iam.gserviceaccount.com"
 $incomingTopic = "sentinelops-incoming-events"
 $internalTopic = "sentinelops-internal-events"
+$deadLetterTopic = "sentinelops-dead-letter-events"
 $subscription = "sentinelops-incoming-sub"
+$deadLetterSubscription = "sentinelops-dead-letter-sub"
 
 function Invoke-GCloud {
     param([string[]]$Arguments)
@@ -65,7 +67,9 @@ Invoke-GCloud @("services", "enable", "run.googleapis.com", "artifactregistry.go
 Ensure-GCloudResource "Firestore (default)" @("firestore", "databases", "describe", "--database=(default)") @("firestore", "databases", "create", "--database=(default)", "--location=$Region", "--type=firestore-native")
 Ensure-GCloudResource "Pub/Sub incoming topic $incomingTopic" @("pubsub", "topics", "describe", $incomingTopic) @("pubsub", "topics", "create", $incomingTopic)
 Ensure-GCloudResource "Pub/Sub internal topic $internalTopic" @("pubsub", "topics", "describe", $internalTopic) @("pubsub", "topics", "create", $internalTopic)
+Ensure-GCloudResource "Pub/Sub dead-letter topic $deadLetterTopic" @("pubsub", "topics", "describe", $deadLetterTopic) @("pubsub", "topics", "create", $deadLetterTopic)
 Ensure-GCloudResource "Pub/Sub subscription $subscription" @("pubsub", "subscriptions", "describe", $subscription) @("pubsub", "subscriptions", "create", $subscription, "--topic=$incomingTopic")
+Ensure-GCloudResource "Pub/Sub dead-letter subscription $deadLetterSubscription" @("pubsub", "subscriptions", "describe", $deadLetterSubscription) @("pubsub", "subscriptions", "create", $deadLetterSubscription, "--topic=$deadLetterTopic")
 
 Ensure-GCloudResource "service account $serviceAccountEmail" @("iam", "service-accounts", "describe", $serviceAccountEmail) @("iam", "service-accounts", "create", $ServiceAccount, "--display-name=SentinelOps Cloud Run runtime")
 Invoke-GCloud @("projects", "add-iam-policy-binding", $ProjectId, "--member=serviceAccount:$serviceAccountEmail", "--role=roles/datastore.user")
@@ -79,4 +83,4 @@ if ($CreateSecret) {
 }
 
 Write-Host "Cloud Run deployment command:" -ForegroundColor Green
-Write-Host ".\scripts\deploy-cloudrun.ps1 -ProjectId $ProjectId -Region $Region -Mode gemini -Store firestore -UseSecretManager -GeminiSecret $SecretName"
+Write-Host ".\scripts\deploy-cloudrun.ps1 -ProjectId $ProjectId -Region $Region -Mode gemini -Store firestore -EnablePubSub -UseSecretManager -GeminiSecret $SecretName"

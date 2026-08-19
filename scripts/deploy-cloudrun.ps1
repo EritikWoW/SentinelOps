@@ -12,6 +12,7 @@ param(
     [string]$Subscription = "sentinelops-incoming-sub",
     [string]$IncomingTopic = "sentinelops-incoming-events",
     [string]$InternalTopic = "sentinelops-internal-events",
+    [string]$DeadLetterTopic = "sentinelops-dead-letter-events",
     [switch]$UseSecretManager,
     [string]$GeminiSecret = "sentinelops-gemini-api-key",
     [switch]$RequireApiToken,
@@ -31,7 +32,7 @@ gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudb
 Write-Host "Deploying $Service to Cloud Run in $Region"
 $pubsubEnabled = if ($EnablePubSub) { "true" } else { "false" }
 $authRequired = if ($RequireApiToken) { "true" } else { "false" }
-$envVars = "SENTINELOPS_MODE=$Mode,SENTINELOPS_STORE=$Store,SENTINELOPS_ENV=production,SENTINELOPS_AUTH_REQUIRED=$authRequired,PUBSUB_ENABLED=$pubsubEnabled,PUBSUB_TOPIC=$IncomingTopic,PUBSUB_INTERNAL_TOPIC=$InternalTopic,PUBSUB_SUBSCRIPTION=$Subscription,FIRESTORE_DATABASE=(default),GOOGLE_CLOUD_PROJECT=$ProjectId,GOOGLE_CLOUD_LOCATION=$Region"
+$envVars = "SENTINELOPS_MODE=$Mode,SENTINELOPS_STORE=$Store,SENTINELOPS_ENV=production,SENTINELOPS_AUTH_REQUIRED=$authRequired,PUBSUB_ENABLED=$pubsubEnabled,PUBSUB_TOPIC=$IncomingTopic,PUBSUB_INTERNAL_TOPIC=$InternalTopic,PUBSUB_SUBSCRIPTION=$Subscription,PUBSUB_DEAD_LETTER_TOPIC=$DeadLetterTopic,FIRESTORE_DATABASE=(default),GOOGLE_CLOUD_PROJECT=$ProjectId,GOOGLE_CLOUD_LOCATION=$Region"
 $deployArgs = @(
     "run", "deploy", $Service,
     "--source", ".",
