@@ -67,6 +67,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: 28px 20px 22px;
   border-right: 1px solid var(--line);
   background: rgba(3, 12, 24, .9);
+  transition: width .22s ease, flex-basis .22s ease, padding .22s ease;
 }
 
 .brand {
@@ -77,6 +78,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .brand-lockup { position: relative; display: block; width: 280px; max-width: none; height: auto; margin: 0 0 0 -12px; object-fit: contain; }
+.sidebar-toggle { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; margin-left: auto; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.sidebar-toggle img { width: 36px; height: 36px; object-fit: contain; }
+.sidebar-toggle:hover { filter: brightness(1.18); }
+.shell.sidebar-collapsed .sidebar { width: 84px; flex-basis: 84px; padding-inline: 13px; }
+.shell.sidebar-collapsed .brand { justify-content: center; padding-bottom: 52px; }
+.shell.sidebar-collapsed .brand-lockup, .shell.sidebar-collapsed .side-label, .shell.sidebar-collapsed .nav-label, .shell.sidebar-collapsed .system-card-copy, .shell.sidebar-collapsed .version { display: none; }
+.shell.sidebar-collapsed .sidebar-toggle { margin: 0; }
+.shell.sidebar-collapsed .nav-item { justify-content: center; padding-inline: 0; }
+.shell.sidebar-collapsed .nav-item img { width: 28px; height: 28px; }
+.shell.sidebar-collapsed .system-card { justify-content: center; padding: 9px; }
 
 .brand-mark {
   display: grid;
@@ -234,7 +245,8 @@ textarea { min-height: 94px; resize: vertical; }
 .policy-row p { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .settings-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .settings-modal h2 { margin: 4px 0 0; font-size: 24px; }
-.settings-close { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 8px; color: var(--muted-strong); background: #0a1b2c; font-size: 20px; line-height: 1; cursor: pointer; }
+.settings-close { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+.settings-close img { width: 42px; height: 42px; object-fit: contain; }
 .settings-close:hover { border-color: var(--accent); color: var(--text); }
 .settings-intro { margin: 14px 0 20px; color: var(--muted); font-size: 12px; }
 .settings-intro code { color: var(--accent); }

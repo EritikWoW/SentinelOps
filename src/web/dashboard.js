@@ -2,6 +2,16 @@ const state = { incident: null };
 const $ = (id) => document.getElementById(id);
 const workflowStages = ["detect", "investigate", "decide", "remediate", "verify", "report"];
 
+function setSidebarCollapsed(collapsed) {
+  const shell = document.querySelector(".shell");
+  const toggle = $("sidebar-toggle");
+  shell.classList.toggle("sidebar-collapsed", collapsed);
+  toggle.setAttribute("aria-expanded", String(!collapsed));
+  toggle.setAttribute("aria-label", collapsed ? "Expand sidebar" : "Collapse sidebar");
+  toggle.querySelector("img").src = `/dashboard-assets/sheet/${collapsed ? "sidebar-expand" : "sidebar-collapse"}.png`;
+  localStorage.setItem("sentinelops.sidebarCollapsed", String(collapsed));
+}
+
 const settings = {
   open: async () => {
     $("settings-backdrop").classList.remove("hidden");
@@ -263,11 +273,15 @@ $("control-body").addEventListener("click", async (event) => {
     controlPanel.close();
   }
 });
+$("sidebar-toggle").addEventListener("click", () => {
+  setSidebarCollapsed(!document.querySelector(".shell").classList.contains("sidebar-collapsed"));
+});
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (!$ ("settings-backdrop").classList.contains("hidden")) settings.close();
   if (!$ ("control-backdrop").classList.contains("hidden")) controlPanel.close();
 });
+setSidebarCollapsed(localStorage.getItem("sentinelops.sidebarCollapsed") === "true");
 updateMetrics();
 refreshNodeStatus();
 window.setInterval(refreshNodeStatus, 15000);

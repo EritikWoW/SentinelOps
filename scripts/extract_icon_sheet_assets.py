@@ -5,6 +5,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src/web/assets/sentinelops-icon-sheet.png"
+CONTROL_SOURCE = ROOT / "src/web/assets/ChatGPT Image 20 авг. 2026 г., 00_50_50.png"
 DEST = ROOT / "src/web/assets/sheet"
 
 
@@ -60,6 +61,16 @@ SMALL = {
     "container": (365, 565, 425, 617),
 }
 
+# Controls added in the revised sheet. These are complete, transparent button
+# assets intended for window chrome and the collapsible sidebar control.
+CONTROLS = {
+    "sidebar-collapse": (63, 915, 117, 971),
+    "sidebar-expand": (176, 915, 230, 971),
+    "window-minimize": (353, 915, 409, 971),
+    "window-maximize": (475, 915, 531, 971),
+    "window-close": (600, 915, 656, 971),
+}
+
 
 def trim_with_padding(image: Image.Image, padding: int = 4) -> Image.Image:
     alpha = image.getchannel("A")
@@ -93,6 +104,9 @@ def main() -> None:
             cropped = clean_brand_background(cropped)
             cropped = trim_with_padding(cropped, padding=2)
         cropped.save(DEST / f"{name}.png", optimize=True)
+    control_source = Image.open(CONTROL_SOURCE).convert("RGBA")
+    for name, bounds in CONTROLS.items():
+        trim_with_padding(control_source.crop(bounds), padding=2).save(DEST / f"{name}.png", optimize=True)
 
 
 if __name__ == "__main__":
