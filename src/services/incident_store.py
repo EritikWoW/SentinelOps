@@ -76,6 +76,21 @@ def _apply_execution(incident: IncidentResponse, detail: str = "") -> IncidentRe
     return updated
 
 
+def _build_report_detail(incident: IncidentResponse) -> str:
+    """Build a deterministic final incident report from verified workflow state."""
+    analysis = incident.analysis
+    if analysis is None or not hasattr(analysis, "verification_status"):
+        raise ValueError("Incident has no reportable analysis")
+
+    outcome = "resolved" if analysis.verification_status == "passed" else "remediation failed"
+    return (
+        f"Incident {incident.incident_id} {outcome}. "
+        f"Root cause: {analysis.root_cause_hypothesis} "
+        f"Remediation: {analysis.remediation_action} "
+        f"Verification: {analysis.verification_result}"
+    )
+
+
 def _apply_verification(incident: IncidentResponse, passed: bool, notes: str) -> IncidentResponse:
     if incident.analysis is None or not hasattr(incident.analysis, "timeline"):
         raise ValueError("Incident has no verification state")
@@ -91,11 +106,13 @@ def _apply_verification(incident: IncidentResponse, passed: bool, notes: str) ->
         "Local health checks passed." if passed else "Local health checks failed."
     )
     updated.status = "resolved" if passed else "remediation_failed"
-    detail = f"Verification {'passed' if passed else 'failed'}: {analysis.verification_result}"
-    analysis.execution_notes = f"{analysis.execution_notes} {detail}".strip()
+    verification_detail = f"Verification {'passed' if passed else 'failed'}: {analysis.verification_result}"
+    report_detail = _build_report_detail(updated)
+    analysis.execution_notes = f"{analysis.execution_notes} {verification_detail} {report_detail}".strip()
     analysis.timeline = [
         *analysis.timeline,
-        TimelineEvent(stage="verify", status="completed", detail=detail),
+        TimelineEvent(stage="verify", status="completed", detail=verification_detail),
+        TimelineEvent(stage="report", status="completed", detail=report_detail),
     ]
     return updated
 
