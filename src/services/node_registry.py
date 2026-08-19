@@ -96,7 +96,17 @@ class FirestoreNodeRegistry(NodeRegistry):
         )
         with self._lock:
             self._items[payload.node_id] = record
-        self._persist(record)
+        reference = self._collection.document(payload.node_id)
+        if snapshot.exists:
+            reference.update({
+                "hostname": record.hostname,
+                "platform": record.platform,
+                "services": record.services,
+                "status": record.status,
+                "last_seen": record.last_seen,
+            })
+        else:
+            self._persist(record)
         return record
 
     def record_incident(self, node_id: str) -> NodeRecord | None:

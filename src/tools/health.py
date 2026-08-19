@@ -6,7 +6,17 @@ import ipaddress
 import socket
 from typing import Any
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Healthchecks must not follow an unvalidated redirect target."""
+
+    def redirect_request(self, req, fp, code, msg, headers, new):
+        return None
+
+
+_NO_REDIRECT_OPENER = build_opener(_NoRedirectHandler)
 
 
 def _validate_health_url(url: str) -> None:
@@ -31,7 +41,7 @@ def get_health_status(url: str, timeout_seconds: float = 3.0, expected_status: i
     try:
         _validate_health_url(url)
         request = Request(url, method="GET")
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with _NO_REDIRECT_OPENER.open(request, timeout=timeout_seconds) as response:
             status_code = response.status
         return {
             "supported": True,
