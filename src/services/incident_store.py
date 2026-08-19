@@ -40,7 +40,10 @@ def _apply_decision(incident: IncidentResponse, decision: str, comment: str) -> 
         detail = "Human approval rejected; remediation remains blocked."
         timeline_status = "blocked"
     else:
-        detail = "Human approval recorded; remediation is authorized but has not executed yet."
+        detail = (
+            "Human approval recorded; remediation is authorized but has not executed yet. "
+            "Without an explicit live target, execution remains simulation-only."
+        )
         timeline_status = "pending"
     if comment:
         detail = f"{detail} Comment: {comment}"
