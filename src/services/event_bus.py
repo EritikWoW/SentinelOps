@@ -112,7 +112,7 @@ class PubSubEventPublisher:
         except ImportError as exc:
             raise RuntimeError("Pub/Sub requires google-cloud-pubsub to be installed") from exc
         project = os.getenv("GOOGLE_CLOUD_PROJECT")
-        topic = os.getenv("PUBSUB_TOPIC", "sentinelops-incidents")
+        topic = os.getenv("PUBSUB_INTERNAL_TOPIC", "sentinelops-internal-events")
         if not project:
             raise RuntimeError("GOOGLE_CLOUD_PROJECT is required for Pub/Sub")
         self._publisher = pubsub_v1.PublisherClient()
@@ -141,7 +141,7 @@ class PubSubEventPublisher:
 
 
 class PubSubEventConsumer:
-    """Inbound Pub/Sub adapter; it is not enabled unless a subscription is configured."""
+    """Consume detector events from the dedicated inbound subscription."""
 
     def __init__(self) -> None:
         try:

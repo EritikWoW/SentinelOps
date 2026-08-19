@@ -77,27 +77,60 @@ class FirestoreNodeRegistry(NodeRegistry):
             from google.cloud import firestore
         except ImportError as exc:
             raise RuntimeError("Firestore backend requires google-cloud-firestore to be installed") from exc
-        self._collection = firestore.Client(
+        self._client = firestore.Client(
             project=os.getenv("GOOGLE_CLOUD_PROJECT") or None,
             database=os.getenv("FIRESTORE_DATABASE", "(default)"),
-        ).collection("nodes")
+        )
+        self._firestore = firestore
+        self._collection = self._client.collection("nodes")
 
     def heartbeat(self, payload: NodeHeartbeat) -> NodeRecord:
-        record = super().heartbeat(payload)
+        snapshot = self._collection.document(payload.node_id).get()
+        previous = NodeRecord.model_validate(snapshot.to_dict()) if snapshot.exists else None
+        now = datetime.now(timezone.utc)
+        record = NodeRecord(
+            **payload.model_dump(),
+            status="online",
+            last_seen=now,
+            active_incidents=previous.active_incidents if previous else 0,
+        )
+        with self._lock:
+            self._items[payload.node_id] = record
         self._persist(record)
         return record
 
     def record_incident(self, node_id: str) -> NodeRecord | None:
-        record = super().record_incident(node_id)
-        if record is not None:
-            self._persist(record)
-        return record
+        snapshot = self._collection.document(node_id).get()
+        if not snapshot.exists:
+            return None
+        reference = self._collection.document(node_id)
+        reference.update({"active_incidents": self._firestore.Increment(1)})
+        record = NodeRecord.model_validate(reference.get().to_dict())
+        with self._lock:
+            self._items[node_id] = record
+        return self._with_status(record)
 
     def record_resolution(self, node_id: str) -> NodeRecord | None:
-        record = super().record_resolution(node_id)
-        if record is not None:
-            self._persist(record)
-        return record
+        reference = self._collection.document(node_id)
+        transaction = self._client.transaction()
+        firestore = self._firestore
+
+        @firestore.transactional
+        def decrement(transaction):
+            snapshot = reference.get(transaction=transaction)
+            if not snapshot.exists:
+                return None
+            current = int(snapshot.to_dict().get("active_incidents", 0))
+            transaction.update(reference, {"active_incidents": max(0, current - 1)})
+            return snapshot.to_dict()
+
+        result = decrement(transaction)
+        if result is None:
+            return None
+        record = NodeRecord.model_validate(reference.get().to_dict())
+        with self._lock:
+            self._items[node_id] = record
+        return self._with_status(record)
 
     def _persist(self, record: NodeRecord) -> None:
         self._collection.document(record.node_id).set(record.model_dump(mode="json"))

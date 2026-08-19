@@ -3,7 +3,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
@@ -26,6 +26,19 @@ event_publisher = build_event_publisher()
 event_consumer: EventConsumer = build_event_consumer()
 node_registry: NodeRegistry = build_node_registry()
 safety_policy = SafetyPolicy()
+
+
+def require_control_token(x_sentinelops_token: str | None = Header(default=None)) -> None:
+    """Protect mutating control-plane routes when deployment auth is enabled."""
+
+    configured = os.getenv("SENTINELOPS_API_TOKEN", "")
+    required = os.getenv("SENTINELOPS_AUTH_REQUIRED", "false").strip().lower() == "true"
+    if not configured and not required:
+        return
+    if not configured:
+        raise HTTPException(status_code=503, detail="Control-plane authentication is not configured")
+    if x_sentinelops_token != configured:
+        raise HTTPException(status_code=401, detail="A valid X-SentinelOps-Token is required")
 
 
 def _handle_external_event(raw_payload: dict[str, object]) -> None:
@@ -111,7 +124,7 @@ def get_settings() -> SettingsResponse:
 
 
 @app.post("/nodes/heartbeat", response_model=NodeRecord)
-def node_heartbeat(payload: NodeHeartbeat) -> NodeRecord:
+def node_heartbeat(payload: NodeHeartbeat, _: None = Depends(require_control_token)) -> NodeRecord:
     """Register a Node heartbeat and return its current liveness record."""
 
     return node_registry.heartbeat(payload)
@@ -138,7 +151,7 @@ def list_incidents(limit: int = 25) -> list[IncidentResponse]:
 
 
 @app.post("/settings", response_model=SettingsResponse)
-def update_settings(payload: SettingsUpdate) -> SettingsResponse:
+def update_settings(payload: SettingsUpdate, _: None = Depends(require_control_token)) -> SettingsResponse:
     """Persist non-secret settings; a process restart applies backend changes."""
 
     return save_settings(payload, os.getenv("SENTINELOPS_ENV_FILE", ".env"))
@@ -152,7 +165,7 @@ def list_events(limit: int = 50) -> list[dict[str, object]]:
 
 
 @app.post("/events", response_model=EventIngestionResponse, status_code=202)
-def ingest_event(payload: NormalizedEvent) -> EventIngestionResponse:
+def ingest_event(payload: NormalizedEvent, _: None = Depends(require_control_token)) -> EventIngestionResponse:
     """Accept one bounded detector event and create an incident when needed."""
 
     if payload.kind == "recovery":
@@ -163,7 +176,7 @@ def ingest_event(payload: NormalizedEvent) -> EventIngestionResponse:
 
 
 @app.post("/events/{event_id}/replay")
-def replay_event(event_id: str) -> dict[str, object]:
+def replay_event(event_id: str, _: None = Depends(require_control_token)) -> dict[str, object]:
     """Replay one local event without mutating its original record."""
 
     try:
@@ -216,7 +229,7 @@ def _classify_action(remediation_action: str) -> str:
 
 
 @app.post("/incidents", response_model=IncidentResponse, status_code=202)
-def create_incident(payload: IncidentCreate) -> IncidentResponse:
+def create_incident(payload: IncidentCreate, _: None = Depends(require_control_token)) -> IncidentResponse:
     return _analyze_and_store(payload)
 
 
@@ -232,6 +245,7 @@ def get_incident(incident_id: str) -> IncidentResponse:
 def decide_incident_approval(
     incident_id: str,
     payload: ApprovalRequest,
+    _: None = Depends(require_control_token),
 ) -> IncidentResponse:
     try:
         updated = incident_store.decide(incident_id, payload.decision, payload.comment)
@@ -244,7 +258,7 @@ def decide_incident_approval(
 
 
 @app.post("/incidents/{incident_id}/execute", response_model=IncidentResponse)
-def execute_incident_remediation(incident_id: str, payload: ExecutionRequest) -> IncidentResponse:
+def execute_incident_remediation(incident_id: str, payload: ExecutionRequest, _: None = Depends(require_control_token)) -> IncidentResponse:
     if not payload.confirm:
         raise HTTPException(status_code=400, detail="Explicit execution confirmation is required")
     try:
@@ -258,7 +272,7 @@ def execute_incident_remediation(incident_id: str, payload: ExecutionRequest) ->
 
 
 @app.post("/incidents/{incident_id}/verify", response_model=IncidentResponse)
-def verify_incident_remediation(incident_id: str, payload: VerificationRequest) -> IncidentResponse:
+def verify_incident_remediation(incident_id: str, payload: VerificationRequest, _: None = Depends(require_control_token)) -> IncidentResponse:
     try:
         updated = incident_store.verify(incident_id, payload.passed, payload.notes)
         if payload.passed and updated.node_id:
@@ -272,7 +286,7 @@ def verify_incident_remediation(incident_id: str, payload: VerificationRequest) 
 
 
 @app.post("/incidents/{incident_id}/verify/health", response_model=IncidentResponse)
-def verify_incident_health(incident_id: str, payload: HealthVerificationRequest) -> IncidentResponse:
+def verify_incident_health(incident_id: str, payload: HealthVerificationRequest, _: None = Depends(require_control_token)) -> IncidentResponse:
     """Verify recovery against a real health endpoint before resolving."""
 
     result = verify_health(payload.url, payload.timeout_seconds, payload.expected_status)

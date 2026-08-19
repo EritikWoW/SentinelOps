@@ -9,9 +9,13 @@ param(
     [string]$Store = "memory",
     [string]$ServiceAccount = "sentinelops-runtime",
     [switch]$EnablePubSub,
-    [string]$Subscription = "sentinelops-events-sub",
+    [string]$Subscription = "sentinelops-incoming-sub",
+    [string]$IncomingTopic = "sentinelops-incoming-events",
+    [string]$InternalTopic = "sentinelops-internal-events",
     [switch]$UseSecretManager,
-    [string]$GeminiSecret = "sentinelops-gemini-api-key"
+    [string]$GeminiSecret = "sentinelops-gemini-api-key",
+    [switch]$RequireApiToken,
+    [string]$ApiTokenSecret = "sentinelops-api-token"
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,7 +30,8 @@ Write-Host "Enabling Cloud Run and Artifact Registry APIs"
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com
 Write-Host "Deploying $Service to Cloud Run in $Region"
 $pubsubEnabled = if ($EnablePubSub) { "true" } else { "false" }
-$envVars = "SENTINELOPS_MODE=$Mode,SENTINELOPS_STORE=$Store,SENTINELOPS_ENV=production,PUBSUB_ENABLED=$pubsubEnabled,PUBSUB_TOPIC=sentinelops-incidents,PUBSUB_SUBSCRIPTION=$Subscription,FIRESTORE_DATABASE=(default),GOOGLE_CLOUD_PROJECT=$ProjectId,GOOGLE_CLOUD_LOCATION=$Region"
+$authRequired = if ($RequireApiToken) { "true" } else { "false" }
+$envVars = "SENTINELOPS_MODE=$Mode,SENTINELOPS_STORE=$Store,SENTINELOPS_ENV=production,SENTINELOPS_AUTH_REQUIRED=$authRequired,PUBSUB_ENABLED=$pubsubEnabled,PUBSUB_TOPIC=$IncomingTopic,PUBSUB_INTERNAL_TOPIC=$InternalTopic,PUBSUB_SUBSCRIPTION=$Subscription,FIRESTORE_DATABASE=(default),GOOGLE_CLOUD_PROJECT=$ProjectId,GOOGLE_CLOUD_LOCATION=$Region"
 $deployArgs = @(
     "run", "deploy", $Service,
     "--source", ".",
@@ -41,8 +46,15 @@ $deployArgs = @(
     "--port", "8080",
     "--service-account", "$ServiceAccount@$ProjectId.iam.gserviceaccount.com"
 )
+$secretBindings = @()
 if ($UseSecretManager) {
-    $deployArgs += @("--set-secrets", "GEMINI_API_KEY=${GeminiSecret}:latest")
+    $secretBindings += "GEMINI_API_KEY=${GeminiSecret}:latest"
+}
+if ($RequireApiToken) {
+    $secretBindings += "SENTINELOPS_API_TOKEN=${ApiTokenSecret}:latest"
+}
+if ($secretBindings.Count -gt 0) {
+    $deployArgs += @("--set-secrets", ($secretBindings -join ","))
 }
 gcloud @deployArgs
 Write-Host "Service URL:"
