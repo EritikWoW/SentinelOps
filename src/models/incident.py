@@ -37,7 +37,7 @@ class ApprovalRequest(BaseModel):
 class ExecutionRequest(BaseModel):
     confirm: bool = False
     action: Literal["cloud_run_rollback"] = "cloud_run_rollback"
-    target_revision: str = Field(min_length=1, max_length=160)
+    target_revision: str | None = Field(default=None, max_length=160)
     region: str | None = Field(default=None, max_length=80)
 
 
