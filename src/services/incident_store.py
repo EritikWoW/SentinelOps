@@ -1,13 +1,9 @@
-"""Small in-memory incident store used by the local MVP.
-
-The interface is deliberately isolated so it can later be backed by Firestore
-without changing the FastAPI routes or agent contract.
-"""
+"""Incident persistence and workflow state transitions."""
 
 from __future__ import annotations
 
-import os
 import json
+import os
 from pathlib import Path
 from threading import RLock
 from typing import Protocol
@@ -24,7 +20,7 @@ class IncidentRepository(Protocol):
     def get(self, incident_id: str) -> IncidentResponse: ...
     def list(self, limit: int = 50) -> list[IncidentResponse]: ...
     def decide(self, incident_id: str, decision: str, comment: str) -> IncidentResponse: ...
-    def execute(self, incident_id: str) -> IncidentResponse: ...
+    def execute(self, incident_id: str, detail: str = "") -> IncidentResponse: ...
     def verify(self, incident_id: str, passed: bool, notes: str) -> IncidentResponse: ...
 
 
@@ -42,23 +38,24 @@ def _apply_decision(incident: IncidentResponse, decision: str, comment: str) -> 
     if decision == "reject":
         analysis.remediation_status = "blocked"
         detail = "Human approval rejected; remediation remains blocked."
+        timeline_status = "blocked"
     else:
-        detail = "Human approval recorded; remediation remains simulation-only."
+        detail = (
+            "Human approval recorded; remediation is authorized but has not executed yet. "
+            "Without an explicit live target, execution remains simulation-only."
+        )
+        timeline_status = "pending"
     if comment:
         detail = f"{detail} Comment: {comment}"
     analysis.execution_notes = f"{analysis.execution_notes} {detail}".strip()
     analysis.timeline = [
         *analysis.timeline,
-        TimelineEvent(
-            stage="remediate",
-            status="blocked" if decision == "reject" else "completed",
-            detail=detail,
-        ),
+        TimelineEvent(stage="remediate", status=timeline_status, detail=detail),
     ]
     return updated
 
 
-def _apply_execution(incident: IncidentResponse) -> IncidentResponse:
+def _apply_execution(incident: IncidentResponse, detail: str = "") -> IncidentResponse:
     if incident.analysis is None or not hasattr(incident.analysis, "timeline"):
         raise ValueError("Incident has no actionable analysis")
     if incident.analysis.requires_human_approval and incident.approval_status != "approved":
@@ -69,14 +66,16 @@ def _apply_execution(incident: IncidentResponse) -> IncidentResponse:
         raise ValueError("Remediation has already been executed")
     if incident.analysis.remediation_status == "blocked":
         raise ValueError("Safety policy blocked this remediation")
-    if incident.execution_mode != "demo":
-        raise ValueError("Live remediation executor is not configured")
 
     updated = incident.model_copy(deep=True)
     analysis = updated.analysis
     analysis.remediation_status = "executed"
-    detail = "Safe demo remediation executed locally; no production infrastructure was mutated."
-    analysis.execution_notes = f"{analysis.execution_notes} {detail}".strip()
+    execution_detail = detail or "Safe demo remediation executed locally; no production infrastructure was mutated."
+    analysis.execution_notes = f"{analysis.execution_notes} {execution_detail}".strip()
+    analysis.timeline = [
+        *analysis.timeline,
+        TimelineEvent(stage="remediate", status="completed", detail=execution_detail),
+    ]
     return updated
 
 
@@ -97,6 +96,10 @@ def _apply_verification(incident: IncidentResponse, passed: bool, notes: str) ->
     updated.status = "resolved" if passed else "remediation_failed"
     detail = f"Verification {'passed' if passed else 'failed'}: {analysis.verification_result}"
     analysis.execution_notes = f"{analysis.execution_notes} {detail}".strip()
+    analysis.timeline = [
+        *analysis.timeline,
+        TimelineEvent(stage="verify", status="completed", detail=detail),
+    ]
     return updated
 
 
@@ -133,12 +136,12 @@ class IncidentStore:
             self._items[incident_id] = updated
             return updated.model_copy(deep=True)
 
-    def execute(self, incident_id: str) -> IncidentResponse:
+    def execute(self, incident_id: str, detail: str = "") -> IncidentResponse:
         with self._lock:
             incident = self._items.get(incident_id)
             if incident is None:
                 raise IncidentNotFoundError(incident_id)
-            updated = _apply_execution(incident)
+            updated = _apply_execution(incident, detail)
             self._items[incident_id] = updated
             return updated.model_copy(deep=True)
 
@@ -187,8 +190,8 @@ class FirestoreIncidentStore:
         updated = _apply_decision(self.get(incident_id), decision, comment)
         return self.save(updated)
 
-    def execute(self, incident_id: str) -> IncidentResponse:
-        updated = _apply_execution(self.get(incident_id))
+    def execute(self, incident_id: str, detail: str = "") -> IncidentResponse:
+        updated = _apply_execution(self.get(incident_id), detail)
         return self.save(updated)
 
     def verify(self, incident_id: str, passed: bool, notes: str) -> IncidentResponse:
@@ -254,9 +257,9 @@ class JsonIncidentStore:
             self._flush()
             return updated.model_copy(deep=True)
 
-    def execute(self, incident_id: str) -> IncidentResponse:
+    def execute(self, incident_id: str, detail: str = "") -> IncidentResponse:
         with self._lock:
-            updated = _apply_execution(self.get(incident_id))
+            updated = _apply_execution(self.get(incident_id), detail)
             self._items[incident_id] = updated
             self._flush()
             return updated.model_copy(deep=True)
