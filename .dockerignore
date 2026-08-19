@@ -1,0 +1,12 @@
+.env
+.venv
+.git
+.idea
+__pycache__
+.pytest_cache
+tests
+docs/_build
+*.pyc
+tmp
+src.zip
+demo
