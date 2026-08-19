@@ -2,7 +2,8 @@ import os
 
 import pytest
 
-from src.agents.adk_agent import _configure_gemini_runtime
+from src.agents.adk_agent import _configure_gemini_runtime, build_root_agent
+from src.models.incident import IncidentAnalysis
 
 
 def test_configure_gemini_runtime_selects_vertex_ai(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -31,3 +32,9 @@ def test_configure_gemini_runtime_requires_project(monkeypatch: pytest.MonkeyPat
 
     with pytest.raises(RuntimeError, match="GOOGLE_CLOUD_PROJECT"):
         _configure_gemini_runtime()
+
+
+def test_root_agent_enforces_incident_analysis_schema() -> None:
+    agent = build_root_agent()
+
+    assert agent.output_schema is IncidentAnalysis
