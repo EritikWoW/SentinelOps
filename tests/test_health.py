@@ -396,7 +396,7 @@ def test_create_incident(monkeypatch) -> None:
     approved_body = approved.json()
     assert approved_body["approval_status"] == "approved"
     assert approved_body["analysis"]["remediation_status"] == "planned"
-    assert "simulation-only" in approved_body["analysis"]["execution_notes"]
+    assert "remediation is authorized but has not executed yet" in approved_body["analysis"]["execution_notes"]
 
     executed = client.post(
         f"/incidents/{incident_id}/execute",
