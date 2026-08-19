@@ -123,6 +123,8 @@ def main() -> None:
         cropped = trim_with_padding(source.crop(bounds))
         if name.startswith("button-") or name == "gear":
             cropped = clean_button_background(cropped)
+            if name == "gear":
+                cropped = trim_with_padding(cropped, padding=1)
         if name == "brand-lockup":
             cropped = clean_brand_background(cropped)
             cropped = trim_with_padding(cropped, padding=2)
