@@ -17,7 +17,23 @@ def _severity(value: object) -> str:
     return "low"
 
 
+def _request_message(payload: dict[str, Any], service: str) -> str | None:
+    http_request = payload.get("httpRequest")
+    if not isinstance(http_request, dict):
+        return None
+    status = http_request.get("status")
+    method = str(http_request.get("requestMethod") or "HTTP")
+    url = str(http_request.get("requestUrl") or service)
+    if status is None:
+        return None
+    return f"Cloud Run request failed: {method} {url} returned HTTP {status}"
+
+
 def _message(payload: dict[str, Any], service: str) -> str:
+    request_message = _request_message(payload, service)
+    if request_message:
+        return request_message
+
     text_payload = payload.get("textPayload")
     if isinstance(text_payload, str) and text_payload.strip():
         return text_payload.strip()
@@ -35,7 +51,8 @@ def is_cloud_logging_entry(payload: dict[str, Any]) -> bool:
 
     resource = payload.get("resource")
     return isinstance(resource, dict) and isinstance(resource.get("type"), str) and any(
-        key in payload for key in ("logName", "insertId", "textPayload", "jsonPayload", "protoPayload")
+        key in payload
+        for key in ("logName", "insertId", "textPayload", "jsonPayload", "protoPayload", "httpRequest")
     )
 
 
@@ -53,10 +70,18 @@ def normalize_pubsub_payload(payload: dict[str, Any]) -> dict[str, Any]:
     revision = str(labels.get("revision_name") or "")
     resource_type = str(resource.get("type") or "unknown")
     message = _message(payload, service)
+    http_request = payload.get("httpRequest") if isinstance(payload.get("httpRequest"), dict) else {}
 
     evidence: list[str] = [message]
     if revision:
         evidence.append(f"Cloud Run revision: {revision}")
+    if http_request:
+        status = http_request.get("status")
+        if status is not None:
+            evidence.append(f"HTTP status: {status}")
+        request_url = http_request.get("requestUrl")
+        if request_url:
+            evidence.append(f"Request URL: {request_url}")
     if payload.get("logName"):
         evidence.append(f"Log: {payload['logName']}")
 
@@ -67,7 +92,7 @@ def normalize_pubsub_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "service": service,
         "severity": _severity(payload.get("severity")),
         "source": "cloud_logging",
-        "trigger": "cloud_logging_error",
+        "trigger": "cloud_run_http_5xx" if http_request else "cloud_logging_error",
         "message": message,
         "evidence": evidence[:20],
         "metadata": {
@@ -75,6 +100,7 @@ def normalize_pubsub_payload(payload: dict[str, Any]) -> dict[str, Any]:
             "gcp_insert_id": payload.get("insertId"),
             "resource_type": resource_type,
             "resource_labels": labels,
+            "http_request": http_request,
         },
     }
 
