@@ -10,7 +10,7 @@ from threading import RLock
 from typing import Any, Callable, Protocol
 from uuid import uuid4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 
 logger = logging.getLogger(__name__)
@@ -154,27 +154,90 @@ class PubSubEventConsumer:
             raise RuntimeError("Pub/Sub requires google-cloud-pubsub to be installed") from exc
         project = os.getenv("GOOGLE_CLOUD_PROJECT")
         subscription = os.getenv("PUBSUB_SUBSCRIPTION")
+        dead_letter_topic = os.getenv("PUBSUB_DEAD_LETTER_TOPIC", "sentinelops-dead-letter-events")
         if not project or not subscription:
             raise RuntimeError("GOOGLE_CLOUD_PROJECT and PUBSUB_SUBSCRIPTION are required for inbound Pub/Sub")
         self._subscriber = pubsub_v1.SubscriberClient()
         self._subscription_path = self._subscriber.subscription_path(project, subscription)
+        self._dead_letter_publisher = pubsub_v1.PublisherClient()
+        self._dead_letter_topic_path = self._dead_letter_publisher.topic_path(project, dead_letter_topic)
         self._streaming_future = None
 
-    def _process_message(self, handler: Callable[[dict[str, Any]], None], message: Any) -> None:
-        """Decode one Pub/Sub message, acknowledging only successful processing."""
+    def _publish_dead_letter(self, message: Any, exc: Exception) -> None:
+        """Persist a permanently invalid inbound message before acknowledging it."""
 
+        original_message_id = getattr(message, "message_id", "unknown")
+        raw_data = message.data.decode("utf-8", errors="replace")
+        dead_letter = {
+            "original_message_id": original_message_id,
+            "subscription": self._subscription_path,
+            "error_type": type(exc).__name__,
+            "error": str(exc),
+            "raw_data": raw_data,
+            "quarantined_at": datetime.now(timezone.utc).isoformat(),
+        }
+        future = self._dead_letter_publisher.publish(
+            self._dead_letter_topic_path,
+            json.dumps(dead_letter, ensure_ascii=False).encode("utf-8"),
+            event_type="dead_letter",
+            original_message_id=original_message_id,
+        )
+        future.result(timeout=10)
+
+    def _handle_permanent_failure(self, message: Any, exc: Exception) -> None:
+        """Quarantine malformed input once; retry only if the quarantine publish fails."""
+
+        context = {
+            "pubsub_message_id": getattr(message, "message_id", "unknown"),
+            "pubsub_subscription": self._subscription_path,
+            "pubsub_dead_letter_topic": self._dead_letter_topic_path,
+        }
+        logger.exception(
+            "Rejected permanently invalid inbound Pub/Sub event; quarantining message",
+            extra=context,
+            exc_info=exc,
+        )
         try:
-            handler(json.loads(message.data.decode("utf-8")))
-            message.ack()
+            self._publish_dead_letter(message, exc)
         except Exception:
             logger.exception(
-                "Failed to process inbound Pub/Sub event; message will be retried",
+                "Failed to publish invalid Pub/Sub event to dead-letter topic; original message will be retried",
+                extra=context,
+            )
+            message.nack()
+            return
+        logger.warning(
+            "Quarantined invalid inbound Pub/Sub event; acknowledging original message",
+            extra=context,
+        )
+        message.ack()
+
+    def _process_message(self, handler: Callable[[dict[str, Any]], None], message: Any) -> None:
+        """Decode one Pub/Sub message, retrying only failures that can recover."""
+
+        try:
+            raw_payload = json.loads(message.data.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            self._handle_permanent_failure(message, exc)
+            return
+
+        try:
+            handler(raw_payload)
+        except ValidationError as exc:
+            self._handle_permanent_failure(message, exc)
+            return
+        except Exception:
+            logger.exception(
+                "Failed to process inbound Pub/Sub event; transient failure will be retried",
                 extra={
                     "pubsub_message_id": getattr(message, "message_id", "unknown"),
                     "pubsub_subscription": self._subscription_path,
                 },
             )
             message.nack()
+            return
+
+        message.ack()
 
     def start(self, handler: Callable[[dict[str, Any]], None]) -> None:
         import threading
