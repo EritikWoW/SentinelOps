@@ -78,8 +78,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .brand-lockup { position: relative; display: block; flex: 1 1 auto; width: auto; max-width: calc(100% - 44px); min-width: 0; height: auto; margin: 0; object-fit: contain; object-position: left center; }
-.sidebar-toggle { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; margin-left: auto; padding: 0; border: 0; background: transparent; cursor: pointer; }
-.sidebar-toggle img { width: 36px; height: 36px; object-fit: contain; }
+.sidebar-toggle { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; margin-left: auto; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.sidebar-toggle img { display: block; width: 32px; height: 32px; object-fit: contain; }
 .sidebar-toggle:hover { filter: brightness(1.18); }
 .shell.sidebar-collapsed .sidebar { width: 84px; flex-basis: 84px; padding-inline: 13px; }
 .shell.sidebar-collapsed .brand { justify-content: center; padding-bottom: 52px; }
