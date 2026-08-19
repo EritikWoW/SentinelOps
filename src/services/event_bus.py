@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from threading import RLock
@@ -10,6 +11,9 @@ from typing import Any, Callable, Protocol
 from uuid import uuid4
 
 from pydantic import BaseModel
+
+
+logger = logging.getLogger(__name__)
 
 
 class EventRecord(BaseModel):
@@ -156,15 +160,27 @@ class PubSubEventConsumer:
         self._subscription_path = self._subscriber.subscription_path(project, subscription)
         self._streaming_future = None
 
+    def _process_message(self, handler: Callable[[dict[str, Any]], None], message: Any) -> None:
+        """Decode one Pub/Sub message, acknowledging only successful processing."""
+
+        try:
+            handler(json.loads(message.data.decode("utf-8")))
+            message.ack()
+        except Exception:
+            logger.exception(
+                "Failed to process inbound Pub/Sub event; message will be retried",
+                extra={
+                    "pubsub_message_id": getattr(message, "message_id", "unknown"),
+                    "pubsub_subscription": self._subscription_path,
+                },
+            )
+            message.nack()
+
     def start(self, handler: Callable[[dict[str, Any]], None]) -> None:
         import threading
 
         def callback(message: Any) -> None:
-            try:
-                handler(json.loads(message.data.decode("utf-8")))
-                message.ack()
-            except Exception:
-                message.nack()
+            self._process_message(handler, message)
 
         self._streaming_future = self._subscriber.subscribe(self._subscription_path, callback)
         threading.Thread(target=self._streaming_future.result, daemon=True).start()
