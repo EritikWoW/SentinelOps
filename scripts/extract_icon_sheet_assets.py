@@ -95,18 +95,30 @@ def clean_brand_background(image: Image.Image) -> Image.Image:
     return image
 
 
+def clean_button_background(image: Image.Image, threshold: int = 80) -> Image.Image:
+    """Remove low-alpha sheet haze while preserving the opaque button art."""
+
+    alpha = image.getchannel("A").point(lambda value: 0 if value < threshold else value)
+    image.putalpha(alpha)
+    return image
+
+
 def main() -> None:
     source = Image.open(SOURCE).convert("RGBA")
     DEST.mkdir(parents=True, exist_ok=True)
     for name, bounds in {**TOP, **NAV_BUTTONS, **SMALL}.items():
         cropped = trim_with_padding(source.crop(bounds))
+        if name.startswith("button-"):
+            cropped = clean_button_background(cropped)
         if name == "brand-lockup":
             cropped = clean_brand_background(cropped)
             cropped = trim_with_padding(cropped, padding=2)
         cropped.save(DEST / f"{name}.png", optimize=True)
     control_source = Image.open(CONTROL_SOURCE).convert("RGBA")
     for name, bounds in CONTROLS.items():
-        trim_with_padding(control_source.crop(bounds), padding=2).save(DEST / f"{name}.png", optimize=True)
+        cropped = trim_with_padding(control_source.crop(bounds), padding=2)
+        cropped = clean_button_background(cropped)
+        cropped.save(DEST / f"{name}.png", optimize=True)
 
 
 if __name__ == "__main__":
