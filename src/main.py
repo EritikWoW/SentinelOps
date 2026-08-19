@@ -15,6 +15,7 @@ from src.services.event_bus import EventConsumer, build_event_consumer, build_ev
 from src.services.ingestion import incident_from_event
 from src.services.incident_store import IncidentNotFoundError, build_incident_store
 from src.services.node_registry import NodeRegistry, build_node_registry
+from src.services.pubsub_push import register_pubsub_push
 from src.services.verification import verify_health
 from src.policy.safety import SafetyPolicy
 from src.services.runtime_settings import current_settings, save_settings
@@ -53,16 +54,20 @@ def _handle_external_event(raw_payload: dict[str, object]) -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Start the optional inbound consumer only for the application lifetime."""
+    """Start pull ingestion only when explicitly selected for local/worker deployments."""
 
-    event_consumer.start(_handle_external_event)
+    delivery_mode = os.getenv("PUBSUB_DELIVERY_MODE", "pull").strip().lower()
+    if delivery_mode == "pull":
+        event_consumer.start(_handle_external_event)
     try:
         yield
     finally:
-        event_consumer.stop()
+        if delivery_mode == "pull":
+            event_consumer.stop()
 
 
-app = FastAPI(title="SentinelOps", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="SentinelOps", version="0.3.0", lifespan=lifespan)
+register_pubsub_push(app, _handle_external_event)
 
 
 @app.get("/", include_in_schema=False)
@@ -113,6 +118,7 @@ def readiness() -> dict[str, object]:
         "mode": coordinator.mode,
         "store": os.getenv("SENTINELOPS_STORE", "memory"),
         "pubsub_enabled": os.getenv("PUBSUB_ENABLED", "false").strip().lower() == "true",
+        "pubsub_delivery_mode": os.getenv("PUBSUB_DELIVERY_MODE", "pull").strip().lower(),
     }
 
 
