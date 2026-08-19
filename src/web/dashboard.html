@@ -17,12 +17,12 @@
         <a class="nav-item" id="safety-nav" href="#safety"><img src="/dashboard-assets/sheet/safety.png" alt="" /> Safety policy</a>
       </nav>
       <div class="side-spacer"></div>
-      <div class="system-card" id="node-card" role="button" tabindex="0" aria-label="Open SentinelOps Nodes"><img src="/dashboard-assets/sheet/button-workflow-layers.png" alt="" /><div><strong id="node-card-title">Demo environment</strong><small id="node-card-status">Local control plane</small></div></div>
-      <div class="version">SENTINELOPS v0.3 · ADK READY</div>
+      <div class="system-card" id="node-card" role="button" tabindex="0" aria-label="Open SentinelOps Nodes"><img src="/dashboard-assets/sheet/button-workflow-layers.png" alt="" /><div><strong id="node-card-title">Cloud control plane</strong><small id="node-card-status">Production runtime</small></div></div>
+      <div class="version">SENTINELOPS v0.4 · ADK LIVE</div>
     </aside>
 
     <main class="main" id="incidents">
-      <header class="topbar"><div><p class="eyebrow">AUTONOMOUS INCIDENT RESPONSE</p><h1>Incident command center</h1></div><div class="top-actions"><span class="mode-pill"><span class="dot"></span><span id="mode-label">DEMO MODE</span></span><button class="icon-button" id="settings-button" aria-label="Settings"><img src="/dashboard-assets/sheet/button-gear.png" alt="" /></button></div></header>
+      <header class="topbar"><div><p class="eyebrow">AUTONOMOUS INCIDENT RESPONSE</p><h1>Incident command center</h1></div><div class="top-actions"><span class="mode-pill"><span class="dot"></span><span id="mode-label">LIVE RUNTIME</span></span><button class="icon-button" id="settings-button" aria-label="Settings"><img src="/dashboard-assets/sheet/button-gear.png" alt="" /></button></div></header>
 
       <section class="metrics" aria-label="System metrics">
         <div class="metric-card"><img class="metric-icon" src="/dashboard-assets/sheet/button-heartbeat.png" alt="" /><div><span class="metric-label">ACTIVE INCIDENTS</span><strong id="metric-active">—</strong><span class="metric-foot good">● Control plane ready</span></div></div>
@@ -33,18 +33,18 @@
       <section class="workspace">
         <div class="panel create-panel">
           <div class="panel-heading"><div><p class="eyebrow">NEW EVENT</p><h2>Dispatch an incident</h2></div><img class="panel-icon" src="/dashboard-assets/sheet/button-add.png" alt="" /></div>
-          <p class="muted">Send a service signal to the Incident Commander. The demo workflow never mutates infrastructure.</p>
+          <p class="muted">Send a service signal to the Incident Commander. High-impact remediation requires explicit approval and is constrained by the configured allowlist.</p>
           <form id="incident-form">
             <label><span class="field-label">Service</span><span class="control-with-icon"><img src="/dashboard-assets/sheet/container.png" alt="" /><input id="service" value="demo-api" required /></span></label>
             <label><span class="field-label">Severity</span><span class="control-with-icon"><img src="/dashboard-assets/sheet/high.png" alt="" /><select id="severity"><option>high</option><option>critical</option><option>medium</option><option>low</option></select></span></label>
             <label>Incident summary<textarea id="summary" required>HTTP 500 rate exceeded after latest deployment</textarea></label>
-            <div class="form-actions"><button class="primary" type="submit"><span>Run incident analysis</span><span>→</span></button><button class="secondary" id="demo-button" type="button"><img src="/dashboard-assets/sheet/logs.png" alt="" /> Load demo scenario</button></div>
+            <div class="form-actions"><button class="primary" type="submit"><span>Run incident analysis</span><span>→</span></button><button class="secondary" id="demo-button" type="button"><img src="/dashboard-assets/sheet/logs.png" alt="" /> Load test scenario</button></div>
           </form>
           <div id="form-error" class="alert error hidden"></div>
         </div>
 
         <div class="panel result-panel" id="result-panel">
-          <div class="empty-state" id="empty-state"><div class="empty-orbit"><img src="/dashboard-assets/sheet/sparkle.png" alt="" /></div><h2>Awaiting an incident</h2><p>Dispatch a signal to see evidence, reasoning, safety checks, and verification appear here.</p></div>
+          <div class="empty-state" id="empty-state"><div class="empty-orbit"><img src="/dashboard-assets/sheet/sparkle.png" alt="" /></div><h2>Awaiting an incident</h2><p>Dispatch a signal to see evidence, reasoning, safety checks, remediation, and verification appear here.</p></div>
           <div id="result-content" class="hidden">
             <div class="panel-heading result-heading"><div><p class="eyebrow">LIVE INVESTIGATION</p><h2 id="incident-title">Incident analysis</h2></div><span id="approval-badge" class="status-badge pending">PENDING</span></div>
             <div class="result-meta"><span id="incident-id"></span><span id="execution-mode"></span></div>
@@ -58,7 +58,7 @@
           </div>
         </div>
       </section>
-      <footer><span><img src="/dashboard-assets/sheet/shield-check.png" alt="" /> SentinelOps operates with explicit permission boundaries.</span><span>All demo actions are simulated · No production systems connected</span></footer>
+      <footer><span><img src="/dashboard-assets/sheet/shield-check.png" alt="" /> SentinelOps operates with explicit permission boundaries.</span><span id="footer-runtime">Live Cloud Run remediation enabled · Approval + verification required</span></footer>
     </main>
   </div>
   <div class="settings-backdrop hidden" id="settings-backdrop" aria-hidden="true">
@@ -92,5 +92,6 @@
     </section>
   </div>
   <script src="/dashboard.js"></script>
+  <script src="/dashboard-assets/dashboard-live.js?v=20260819-1"></script>
 </body>
 </html>
