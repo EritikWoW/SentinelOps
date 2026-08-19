@@ -1,64 +1,70 @@
-"""Small service whose health and log state can be broken and recovered."""
+"""Cloud Run demo target with deterministic healthy and broken revisions."""
 
 from __future__ import annotations
 
-import argparse
 import logging
-from pathlib import Path
+import os
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import uvicorn
 
 
-LOG_PATH = Path(__file__).parent / "logs" / "application.log"
-LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-    handlers=[logging.FileHandler(LOG_PATH, encoding="utf-8"), logging.StreamHandler()],
-)
-logger = logging.getLogger("sentinelops-demo")
-app = FastAPI(title="SentinelOps Demo Service")
-broken = False
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger("sentinelops-demo-api")
+
+app = FastAPI(title="SentinelOps Demo API")
+VERSION = os.getenv("DEMO_VERSION", "v1").strip() or "v1"
+BROKEN = os.getenv("DEMO_BROKEN", "false").strip().lower() == "true"
+FAILURE_REASON = os.getenv("DEMO_FAILURE_REASON", "database connection failed").strip()
 
 
 @app.get("/health")
 def health() -> JSONResponse:
-    if broken:
-        logger.error("FATAL database connection failed; demo service is broken")
-        return JSONResponse(status_code=500, content={"status": "unhealthy", "reason": "database connection failed"})
-    return JSONResponse(status_code=200, content={"status": "healthy"})
+    if BROKEN:
+        logger.error(
+            "demo_api_health_failed version=%s reason=%s",
+            VERSION,
+            FAILURE_REASON,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "service": "demo-api",
+                "version": VERSION,
+                "status": "unhealthy",
+                "reason": FAILURE_REASON,
+            },
+        )
 
-
-@app.post("/break")
-def break_service() -> dict[str, str]:
-    global broken
-    broken = True
-    logger.error("FATAL database connection failed; demo service entered broken state")
-    return {"status": "broken"}
-
-
-@app.post("/recover")
-def recover_service() -> dict[str, str]:
-    global broken
-    broken = False
-    logger.info("INFO database connection restored; demo service recovered")
-    return {"status": "healthy"}
+    logger.info("demo_api_health_ok version=%s", VERSION)
+    return JSONResponse(
+        status_code=200,
+        content={"service": "demo-api", "version": VERSION, "status": "healthy"},
+    )
 
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"service": "demo-api", "status": "broken" if broken else "healthy"}
+    return {
+        "service": "demo-api",
+        "version": VERSION,
+        "status": "broken" if BROKEN else "healthy",
+    }
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the SentinelOps broken service demo")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=9000)
-    args = parser.parse_args()
-    uvicorn.run(app, host=args.host, port=args.port)
+@app.get("/work")
+def work() -> JSONResponse:
+    """Return a realistic application response used to generate 5xx traffic."""
+
+    if BROKEN:
+        logger.error("demo_api_request_failed version=%s reason=%s", VERSION, FAILURE_REASON)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "internal server error", "version": VERSION},
+        )
+    return JSONResponse(status_code=200, content={"result": "ok", "version": VERSION})
 
 
 if __name__ == "__main__":
-    main()
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
