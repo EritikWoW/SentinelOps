@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SentinelOps · Incident Command</title>
   <link rel="stylesheet" href="/dashboard.css?v=20260819-3" />
+  <link rel="stylesheet" href="/dashboard-assets/dashboard-live.css?v=20260819-2" />
 </head>
 <body>
   <div class="shell">
@@ -54,7 +55,7 @@
             </div>
             <div class="evidence-section"><span class="block-label">EVIDENCE COLLECTED</span><ul id="evidence-list"></ul></div>
             <div class="timeline-section" id="workflow"><div class="section-row"><span class="block-label">WORKFLOW TIMELINE</span><span id="timeline-count" class="muted"></span></div><div id="timeline" class="timeline"></div></div>
-            <div class="approval-section" id="safety"><div><span class="block-label">SAFETY GATE</span><p id="approval-note" class="muted"></p></div><div class="approval-actions"><input id="approval-comment" placeholder="Approval comment (optional)" /><button id="reject-button" class="danger" type="button">Reject</button><button id="approve-button" class="approve" type="button">Approve</button><button id="execute-button" class="execute" type="button">Execute safe action</button><button id="verify-button" class="verify" type="button">Run verification</button></div></div>
+            <div class="approval-section" id="safety"><div><span class="block-label">SAFETY GATE</span><p id="approval-note" class="muted"></p></div><div class="approval-actions"><input id="approval-comment" placeholder="Approval comment (optional)" /><button id="reject-button" class="danger" type="button">Reject</button><button id="approve-button" class="approve" type="button">Approve</button><div class="execution-targets hidden" id="execution-targets"><input id="target-revision" placeholder="Target Cloud Run revision, e.g. demo-api-00003-fqh" /><input id="target-region" value="europe-west1" placeholder="Cloud Run region" /></div><button id="execute-button" class="execute" type="button">Execute approved rollback</button><button id="verify-button" class="verify" type="button">Run health verification</button></div></div>
           </div>
         </div>
       </section>
@@ -64,7 +65,7 @@
   <div class="settings-backdrop hidden" id="settings-backdrop" aria-hidden="true">
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="settings-modal-header"><div><p class="eyebrow">CONTROL PLANE CONFIGURATION</p><h2 id="settings-title">Settings</h2></div><button class="settings-close" id="settings-close" type="button" aria-label="Close settings">×</button></div>
-      <p class="settings-intro">Manage non-secret SentinelOps runtime configuration. Backend changes are written to <code>.env</code> and apply after restarting the API.</p>
+      <p class="settings-intro" id="settings-intro">Inspect SentinelOps runtime configuration.</p>
       <form id="settings-form">
         <div class="settings-grid">
           <label>Operating mode<select id="settings-mode"><option value="demo">Demo mode</option><option value="gemini">Gemini / ADK</option></select></label>
@@ -80,7 +81,7 @@
         </div>
         <div class="settings-safety"><img src="/dashboard-assets/sheet/shield-check.png" alt="" /><div><strong>Human approval is enforced</strong><p>High-impact remediation cannot run without explicit approval. This safety boundary is read-only from the dashboard.</p></div><span class="locked-pill">LOCKED</span></div>
         <div class="settings-status hidden" id="settings-status" role="status"></div>
-        <div class="settings-footer"><span class="settings-runtime" id="settings-runtime">Loading runtime status…</span><div><button class="secondary" id="settings-cancel" type="button">Cancel</button><button class="primary settings-save" type="submit">Save configuration</button></div></div>
+        <div class="settings-footer"><span class="settings-runtime" id="settings-runtime">Loading runtime status…</span><div><button class="secondary" id="settings-cancel" type="button">Close</button><button class="primary settings-save" id="settings-save" type="submit">Save configuration</button></div></div>
       </form>
     </section>
   </div>
@@ -92,6 +93,6 @@
     </section>
   </div>
   <script src="/dashboard.js"></script>
-  <script src="/dashboard-assets/dashboard-live.js?v=20260819-2"></script>
+  <script src="/dashboard-assets/dashboard-live.js?v=20260819-3"></script>
 </body>
 </html>
