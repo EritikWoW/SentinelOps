@@ -12,18 +12,18 @@ if [[ -z "${PROJECT_ID}" ]]; then
 fi
 
 DESTINATION="pubsub.googleapis.com/projects/${PROJECT_ID}/topics/${TOPIC}"
-LOG_FILTER="resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE_NAME}\" AND severity>=ERROR AND (textPayload:\"demo_api_health_failed\" OR textPayload:\"demo_api_request_failed\")"
+LOG_FILTER="resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE_NAME}\" AND httpRequest.status>=500"
 
 if gcloud logging sinks describe "${SINK_NAME}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
   gcloud logging sinks update "${SINK_NAME}" "${DESTINATION}" \
     --project="${PROJECT_ID}" \
     --log-filter="${LOG_FILTER}" \
-    --description="Route ${SERVICE_NAME} failure logs into SentinelOps detection"
+    --description="Route ${SERVICE_NAME} Cloud Run 5xx request logs into SentinelOps detection"
 else
   gcloud logging sinks create "${SINK_NAME}" "${DESTINATION}" \
     --project="${PROJECT_ID}" \
     --log-filter="${LOG_FILTER}" \
-    --description="Route ${SERVICE_NAME} failure logs into SentinelOps detection"
+    --description="Route ${SERVICE_NAME} Cloud Run 5xx request logs into SentinelOps detection"
 fi
 
 WRITER_IDENTITY="$(gcloud logging sinks describe "${SINK_NAME}" --project="${PROJECT_ID}" --format='value(writerIdentity)')"
