@@ -1,0 +1,24 @@
+node:
+  id: workstation-01
+  server_url: http://127.0.0.1:8080
+  version: 0.1.0
+
+poll_interval_seconds: 5
+heartbeat_interval_seconds: 30
+
+collectors:
+  logs:
+    - service: demo-app
+      path: ./demo/logs/application.log
+      rules:
+        - pattern: ERROR
+          severity: high
+        - pattern: FATAL
+          severity: critical
+  healthchecks:
+    - service: demo-api
+      url: http://127.0.0.1:9000/health
+      interval_seconds: 10
+      timeout_seconds: 3
+      expected_status: 200
+      failure_threshold: 3
