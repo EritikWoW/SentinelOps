@@ -161,8 +161,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .top-actions { display: flex; align-items: center; gap: 16px; }
 .mode-pill { display: flex; align-items: center; gap: 11px; padding: 10px 17px; border: 1px solid #167d78; border-radius: 22px; color: #80f5e7; background: #08272d; box-shadow: 0 0 22px rgba(38, 228, 211, .08); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
 .mode-pill .dot { width: 7px; height: 7px; box-shadow: none; }
-.icon-button { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 1px solid #1d6b86; border-radius: 9px; color: #9eb5c9; background: transparent; font-size: 17px; }
-.icon-button img { width: 40px; height: 40px; object-fit: contain; transform: none; }
+.icon-button { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 9px; color: #9eb5c9; background: transparent; font-size: 17px; }
+.icon-button img { width: 42px; height: 42px; object-fit: contain; transform: none; }
 .icon-button:hover { border-color: var(--line-bright); color: var(--text); filter: brightness(1.18); }
 
 .metrics { display: grid; flex: 0 0 auto; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 17px; }
@@ -247,8 +247,8 @@ textarea { min-height: 94px; resize: vertical; }
 .policy-row p { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .settings-modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .settings-modal h2 { margin: 4px 0 0; font-size: 24px; }
-.settings-close { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 1px solid #1d6b86; border-radius: 8px; background: transparent; cursor: pointer; }
-.settings-close img { width: 40px; height: 40px; object-fit: contain; }
+.settings-close { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+.settings-close img { width: 42px; height: 42px; object-fit: contain; }
 .settings-close:hover { border-color: var(--accent); color: var(--text); filter: brightness(1.18); }
 .settings-intro { margin: 14px 0 20px; color: var(--muted); font-size: 12px; }
 .settings-intro code { color: var(--accent); }
