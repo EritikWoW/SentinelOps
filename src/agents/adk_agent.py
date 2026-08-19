@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -20,6 +21,7 @@ from src.tools.process import get_process_status
 load_dotenv(override=False)
 
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+logger = logging.getLogger(__name__)
 
 SAFETY_INSTRUCTION = """
 SentinelOps is an incident commander, not an unrestricted infrastructure operator.
@@ -59,7 +61,7 @@ def _specialist(name: str, role: str) -> Agent:
 
 
 def build_root_agent() -> Agent:
-    """Build the coordinator and specialist-agent graph used by the MVP."""
+    """Build the tool-using investigator and specialist-agent graph."""
 
     return Agent(
         name="sentinelops_incident_commander",
@@ -68,14 +70,14 @@ def build_root_agent() -> Agent:
         instruction=(
             "You are the SentinelOps Incident Commander. Follow this workflow: "
             "detect -> investigate -> decide -> remediate -> verify -> report. "
-            "Delegate relevant investigation to the specialist agents. Your final answer is constrained "
-            "by the IncidentAnalysis output schema. Populate every required field using only bounded "
-            "incident evidence and actual tool results. "
+            "Delegate relevant investigation to the specialist agents. Produce a concise factual "
+            "investigation report for a separate formatter agent. Include the root-cause hypothesis, "
+            "bounded evidence, proposed remediation, risk, approval requirement, verification plan, "
+            "and incident summary. Do not execute remediation. "
             f"{SAFETY_INSTRUCTION} "
             "Use only the supplied evidence and these read-only tools when their inputs are available. "
             "Never claim that a tool was called unless its result is present."
         ),
-        output_schema=IncidentAnalysis,
         tools=[get_recent_logs, get_health_status, get_process_status],
         sub_agents=[
             _specialist("log_analysis_agent", "Log Analysis Agent"),
@@ -84,6 +86,23 @@ def build_root_agent() -> Agent:
             _specialist("remediation_agent", "Remediation Agent"),
             _specialist("verification_agent", "Verification Agent"),
         ],
+    )
+
+
+def build_formatter_agent() -> Agent:
+    """Build a tool-free formatter that enforces the application output contract."""
+
+    return Agent(
+        name="sentinelops_incident_formatter",
+        model=MODEL,
+        description="Normalizes a completed incident investigation into the API contract.",
+        instruction=(
+            "Convert the supplied incident investigation into the IncidentAnalysis schema. "
+            "Do not add facts, evidence, tool results, actions, or claims that are not present in the "
+            "supplied incident and investigation report. Preserve uncertainty. A remediation proposal "
+            "is not execution. High-impact or destructive remediation requires human approval."
+        ),
+        output_schema=IncidentAnalysis,
     )
 
 
@@ -97,8 +116,10 @@ class ADKIncidentAgent:
         if self.mode == "gemini":
             _configure_gemini_runtime()
             self.root_agent = build_root_agent()
+            self.formatter_agent = build_formatter_agent()
         else:
             self.root_agent = None
+            self.formatter_agent = None
 
     def analyze(self, incident: IncidentCreate) -> str:
         """Run one isolated incident analysis and return the final JSON text."""
@@ -107,7 +128,7 @@ class ADKIncidentAgent:
             return json.dumps(_demo_analysis(incident), ensure_ascii=False)
 
         prompt = (
-            "Analyze this incident and produce the required structured response.\n"
+            "Analyze this incident and produce an evidence-bounded investigation report.\n"
             f"Service: {incident.service}\n"
             f"Severity: {incident.severity}\n"
             f"Summary: {incident.summary}\n"
@@ -117,9 +138,11 @@ class ADKIncidentAgent:
             f"Bounded evidence: {json.dumps([item.model_dump(mode='json') if hasattr(item, 'model_dump') else item for item in incident.evidence], ensure_ascii=False)}"
         )
         try:
-            return asyncio.run(self._run(prompt))
+            return asyncio.run(self._run_two_stage(prompt))
         except Exception as exc:
-            # Avoid leaking provider traces or credential metadata through the API.
+            # Keep provider details out of the public API, but preserve the full
+            # traceback in Cloud Logging for operator diagnosis.
+            logger.exception("Gemini ADK incident analysis failed")
             if "PERMISSION_DENIED" in str(exc) or "403" in str(exc):
                 raise RuntimeError(
                     "Vertex AI rejected the request (403). Grant the Cloud Run runtime service account "
@@ -127,14 +150,35 @@ class ADKIncidentAgent:
                 ) from exc
             raise RuntimeError(f"Gemini request failed: {type(exc).__name__}") from exc
 
-    async def _run(self, prompt: str) -> str:
-        if self.root_agent is None:
+    async def _run_two_stage(self, prompt: str) -> str:
+        if self.root_agent is None or self.formatter_agent is None:
             raise RuntimeError("The ADK agent is unavailable in demo mode")
-        runner = InMemoryRunner(agent=self.root_agent, app_name="sentinelops")
+
+        investigation = await self._run_agent(
+            self.root_agent,
+            prompt,
+            session_id="incident-investigation",
+        )
+        formatter_prompt = (
+            "Normalize the following completed SentinelOps investigation into the required structured "
+            "IncidentAnalysis response. Use only the supplied incident context and investigation report.\n\n"
+            f"Original incident:\n{prompt}\n\n"
+            f"Investigation report:\n{investigation}"
+        )
+        return await self._run_agent(
+            self.formatter_agent,
+            formatter_prompt,
+            session_id="incident-formatting",
+        )
+
+    async def _run_agent(self, agent: Agent, prompt: str, session_id: str) -> str:
+        """Run one ADK agent and return its latest text response."""
+
+        runner = InMemoryRunner(agent=agent, app_name="sentinelops")
         events = await runner.run_debug(
             prompt,
             user_id="sentinelops-api",
-            session_id="incident-analysis",
+            session_id=session_id,
             quiet=True,
         )
         for event in reversed(events):
@@ -144,8 +188,8 @@ class ADKIncidentAgent:
             for part in reversed(content.parts):
                 text = getattr(part, "text", None)
                 if text:
-                    return _extract_json(text)
-        raise RuntimeError("ADK returned no final analysis")
+                    return _extract_json(text) if agent.output_schema else text.strip()
+        raise RuntimeError(f"ADK agent '{agent.name}' returned no final text response")
 
 
 def _demo_analysis(incident: IncidentCreate) -> dict[str, object]:
