@@ -15,8 +15,9 @@ if ($Apply -and -not (Get-Command gcloud -ErrorAction SilentlyContinue)) {
 }
 
 $serviceAccountEmail = "$ServiceAccount@$ProjectId.iam.gserviceaccount.com"
-$topic = "sentinelops-incidents"
-$subscription = "sentinelops-events-sub"
+$incomingTopic = "sentinelops-incoming-events"
+$internalTopic = "sentinelops-internal-events"
+$subscription = "sentinelops-incoming-sub"
 
 function Invoke-GCloud {
     param([string[]]$Arguments)
@@ -62,8 +63,9 @@ Invoke-GCloud @("config", "set", "project", $ProjectId)
 Invoke-GCloud @("services", "enable", "run.googleapis.com", "artifactregistry.googleapis.com", "cloudbuild.googleapis.com", "firestore.googleapis.com", "pubsub.googleapis.com", "secretmanager.googleapis.com")
 
 Ensure-GCloudResource "Firestore (default)" @("firestore", "databases", "describe", "--database=(default)") @("firestore", "databases", "create", "--database=(default)", "--location=$Region", "--type=firestore-native")
-Ensure-GCloudResource "Pub/Sub topic $topic" @("pubsub", "topics", "describe", $topic) @("pubsub", "topics", "create", $topic)
-Ensure-GCloudResource "Pub/Sub subscription $subscription" @("pubsub", "subscriptions", "describe", $subscription) @("pubsub", "subscriptions", "create", $subscription, "--topic=$topic")
+Ensure-GCloudResource "Pub/Sub incoming topic $incomingTopic" @("pubsub", "topics", "describe", $incomingTopic) @("pubsub", "topics", "create", $incomingTopic)
+Ensure-GCloudResource "Pub/Sub internal topic $internalTopic" @("pubsub", "topics", "describe", $internalTopic) @("pubsub", "topics", "create", $internalTopic)
+Ensure-GCloudResource "Pub/Sub subscription $subscription" @("pubsub", "subscriptions", "describe", $subscription) @("pubsub", "subscriptions", "create", $subscription, "--topic=$incomingTopic")
 
 Ensure-GCloudResource "service account $serviceAccountEmail" @("iam", "service-accounts", "describe", $serviceAccountEmail) @("iam", "service-accounts", "create", $ServiceAccount, "--display-name=SentinelOps Cloud Run runtime")
 Invoke-GCloud @("projects", "add-iam-policy-binding", $ProjectId, "--member=serviceAccount:$serviceAccountEmail", "--role=roles/datastore.user")

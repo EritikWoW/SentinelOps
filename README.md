@@ -306,8 +306,10 @@ For a Google Cloud deployment, configure the same service with:
 SENTINELOPS_STORE=firestore
 PUBSUB_ENABLED=true
 GOOGLE_CLOUD_PROJECT=sentinelops-505805
-PUBSUB_TOPIC=sentinelops-incidents
-PUBSUB_SUBSCRIPTION=sentinelops-events-sub
+PUBSUB_TOPIC=sentinelops-incoming-events
+PUBSUB_INTERNAL_TOPIC=sentinelops-internal-events
+PUBSUB_SUBSCRIPTION=sentinelops-incoming-sub
+SENTINELOPS_AUTH_REQUIRED=true
 FIRESTORE_DATABASE=(default)
 ```
 

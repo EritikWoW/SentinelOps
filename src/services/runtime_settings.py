@@ -38,7 +38,7 @@ def current_settings() -> SettingsResponse:
         model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
         store=store,
         pubsub_enabled=_bool(os.getenv("PUBSUB_ENABLED")),
-        pubsub_topic=os.getenv("PUBSUB_TOPIC", "sentinelops-incidents"),
+        pubsub_topic=os.getenv("PUBSUB_TOPIC", "sentinelops-incoming-events"),
         pubsub_subscription=os.getenv("PUBSUB_SUBSCRIPTION", ""),
         firestore_database=os.getenv("FIRESTORE_DATABASE", "(default)"),
         project=os.getenv("GOOGLE_CLOUD_PROJECT", ""),

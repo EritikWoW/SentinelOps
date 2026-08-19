@@ -11,6 +11,7 @@ from src.collectors.log_file import LogFileCollector, LogRule
 from src.models.events import NormalizedEvent
 from src.policy.safety import SafetyPolicy
 from src.tools.remediation import restart_process, restart_service
+from src.tools.health import get_health_status
 from src.services.event_bus import InMemoryEventConsumer
 from src.models.incident import IncidentCreate
 from src.models.incident import IncidentResponse
@@ -32,6 +33,21 @@ def test_readiness_contract_is_safe() -> None:
     assert body["status"] == "ready"
     assert body["service"] == "sentinelops"
     assert "GEMINI_API_KEY" not in response.text
+
+
+def test_mutating_control_plane_requires_configured_token(monkeypatch) -> None:
+    monkeypatch.setenv("SENTINELOPS_API_TOKEN", "test-token")
+    monkeypatch.setenv("SENTINELOPS_AUTH_REQUIRED", "true")
+    payload = {"node_id": "auth-test", "hostname": "host", "platform": "windows"}
+    assert client.post("/nodes/heartbeat", json=payload).status_code == 401
+    authorized = client.post("/nodes/heartbeat", json=payload, headers={"X-SentinelOps-Token": "test-token"})
+    assert authorized.status_code == 200
+
+
+def test_health_tool_rejects_private_targets() -> None:
+    result = get_health_status("http://127.0.0.1:8080/health")
+    assert result["healthy"] is False
+    assert "private or local" in result["reason"]
 
 
 def test_application_lifespan_starts_and_stops_event_consumer(monkeypatch) -> None:
