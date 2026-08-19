@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from src.models.evidence import EvidenceItem
 
 
-EventSource = Literal["log_file", "healthcheck", "process", "metric", "manual", "pubsub", "unknown"]
+EventSource = Literal["log_file", "healthcheck", "process", "metric", "manual", "pubsub", "cloud_logging", "unknown"]
 EventKind = Literal["incident", "recovery"]
 
 

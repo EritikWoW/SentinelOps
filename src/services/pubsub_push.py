@@ -15,6 +15,8 @@ from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2 import id_token
 from pydantic import ValidationError
 
+from src.services.cloud_logging_adapter import normalize_pubsub_payload
+
 logger = logging.getLogger(__name__)
 
 
@@ -103,7 +105,7 @@ def register_pubsub_push(app: FastAPI, handler: Callable[[dict[str, object]], No
         raw_payload: object = envelope
         try:
             raw_payload, message_id = _decode_envelope(envelope)
-            handler(raw_payload)
+            handler(normalize_pubsub_payload(raw_payload))
         except (ValueError, ValidationError) as exc:
             try:
                 _publish_dead_letter(raw_payload, message_id, exc)
