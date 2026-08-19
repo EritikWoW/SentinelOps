@@ -18,8 +18,14 @@ def _allowed_services() -> set[str]:
     return {item.strip() for item in raw.split(",") if item.strip()}
 
 
-def rollback_cloud_run(service: str, target_revision: str, region: str | None = None) -> str:
+def rollback_cloud_run(service: str, target_revision: str | None, region: str | None = None) -> str:
     """Route 100 percent of one allowlisted Cloud Run service to one named revision."""
+
+    mode = os.getenv("SENTINELOPS_MODE", "demo").strip().lower()
+    if mode == "demo" and not target_revision:
+        return "Safe demo remediation executed locally; no production infrastructure was mutated."
+    if not target_revision:
+        raise CloudRunExecutionError("target_revision is required for live Cloud Run rollback")
 
     allowed = _allowed_services()
     if service not in allowed:
