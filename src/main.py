@@ -1,7 +1,9 @@
 import json
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from threading import RLock
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
@@ -28,6 +30,7 @@ event_publisher = build_event_publisher()
 event_consumer: EventConsumer = build_event_consumer()
 node_registry: NodeRegistry = build_node_registry()
 safety_policy = SafetyPolicy()
+_detector_correlation_lock = RLock()
 
 
 def require_control_token(x_sentinelops_token: str | None = Header(default=None)) -> None:
@@ -43,6 +46,58 @@ def require_control_token(x_sentinelops_token: str | None = Header(default=None)
         raise HTTPException(status_code=401, detail="A valid X-SentinelOps-Token is required")
 
 
+def _correlation_window_seconds() -> int:
+    """Return the bounded event-correlation window used to suppress alert storms."""
+
+    raw = os.getenv("SENTINELOPS_INCIDENT_CORRELATION_SECONDS", "60").strip()
+    try:
+        seconds = int(raw)
+    except ValueError:
+        seconds = 60
+    return max(0, min(seconds, 600))
+
+
+def _find_correlated_incident(payload: NormalizedEvent) -> IncidentResponse | None:
+    """Reuse a recent unresolved incident for the same detector/service/node tuple."""
+
+    window = _correlation_window_seconds()
+    if window <= 0:
+        return None
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=window)
+    for incident in incident_store.list(25):
+        if incident.created_at < cutoff:
+            break
+        if incident.status in {"resolved", "remediation_failed"}:
+            continue
+        if (
+            incident.service == payload.service
+            and incident.node_id == payload.node_id
+            and incident.trigger == payload.trigger
+        ):
+            return incident
+    return None
+
+
+def _process_detector_event(payload: NormalizedEvent) -> IncidentResponse:
+    """Correlate repeated detector events before invoking Gemini for a new incident."""
+
+    with _detector_correlation_lock:
+        existing = _find_correlated_incident(payload)
+        if existing is not None:
+            event_publisher.publish(
+                "incident.correlated",
+                {
+                    "event_id": payload.event_id,
+                    "incident_id": existing.incident_id,
+                    "service": payload.service,
+                    "node_id": payload.node_id,
+                    "trigger": payload.trigger,
+                },
+            )
+            return existing
+        return _analyze_and_store(incident_from_event(payload))
+
+
 def _handle_external_event(raw_payload: dict[str, object]) -> None:
     """Validate and route one Pub/Sub payload through the normal event path."""
 
@@ -50,7 +105,7 @@ def _handle_external_event(raw_payload: dict[str, object]) -> None:
     if payload.kind == "recovery":
         event_publisher.publish("incident.recovered", payload.model_dump(mode="json"))
         return
-    _analyze_and_store(incident_from_event(payload))
+    _process_detector_event(payload)
 
 
 @asynccontextmanager
@@ -173,12 +228,12 @@ def list_events(limit: int = 50) -> list[dict[str, object]]:
 
 @app.post("/events", response_model=EventIngestionResponse, status_code=202)
 def ingest_event(payload: NormalizedEvent, _: None = Depends(require_control_token)) -> EventIngestionResponse:
-    """Accept one bounded detector event and create an incident when needed."""
+    """Accept one bounded detector event and create or correlate an incident when needed."""
 
     if payload.kind == "recovery":
         event_publisher.publish("incident.recovered", payload.model_dump(mode="json"))
         return EventIngestionResponse(event_id=payload.event_id, kind=payload.kind)
-    stored = _analyze_and_store(incident_from_event(payload))
+    stored = _process_detector_event(payload)
     return EventIngestionResponse(event_id=payload.event_id, kind=payload.kind, incident=stored)
 
 
