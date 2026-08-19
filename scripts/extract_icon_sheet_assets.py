@@ -72,6 +72,19 @@ CONTROLS = {
 }
 
 
+def extract_close_icon(image: Image.Image) -> Image.Image:
+    """Extract only the cyan close glyph from the complete window button."""
+
+    crop = image.crop((612, 927, 644, 959)).convert("RGBA")
+    pixels = crop.load()
+    for y in range(crop.height):
+        for x in range(crop.width):
+            red, green, blue, alpha = pixels[x, y]
+            if green < 90 or blue < 100:
+                pixels[x, y] = (red, green, blue, 0)
+    return trim_with_padding(crop, padding=1)
+
+
 def trim_with_padding(image: Image.Image, padding: int = 4) -> Image.Image:
     alpha = image.getchannel("A")
     bbox = alpha.getbbox()
@@ -108,7 +121,7 @@ def main() -> None:
     DEST.mkdir(parents=True, exist_ok=True)
     for name, bounds in {**TOP, **NAV_BUTTONS, **SMALL}.items():
         cropped = trim_with_padding(source.crop(bounds))
-        if name.startswith("button-"):
+        if name.startswith("button-") or name == "gear":
             cropped = clean_button_background(cropped)
         if name == "brand-lockup":
             cropped = clean_brand_background(cropped)
@@ -119,6 +132,7 @@ def main() -> None:
         cropped = trim_with_padding(control_source.crop(bounds), padding=2)
         cropped = clean_button_background(cropped)
         cropped.save(DEST / f"{name}.png", optimize=True)
+    extract_close_icon(control_source).save(DEST / "close-icon.png", optimize=True)
 
 
 if __name__ == "__main__":
