@@ -65,7 +65,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   display: flex;
   flex-direction: column;
   padding: 28px 20px 22px;
-  border-right: 1px solid var(--line);
+  border-right: 0;
   background: rgba(3, 12, 24, .9);
   transition: width .22s ease, flex-basis .22s ease, padding .22s ease;
 }
