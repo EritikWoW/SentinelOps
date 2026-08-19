@@ -4,47 +4,48 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SentinelOps · Incident Command</title>
-  <link rel="stylesheet" href="/dashboard.css?v=20260817-2" />
+  <link rel="stylesheet" href="/dashboard.css?v=20260819-3" />
+  <link rel="stylesheet" href="/dashboard-assets/dashboard-live.css?v=20260819-2" />
 </head>
 <body>
   <div class="shell">
-    <aside class="sidebar">
-      <div class="brand"><img class="brand-lockup" src="/dashboard-assets/sheet/brand-lockup-final.png" alt="SentinelOps Incident Command Center" /></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><img class="brand-lockup" src="/dashboard-assets/sheet/brand-lockup-final.png" alt="SentinelOps Incident Command Center" /><button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-label="Collapse sidebar" aria-expanded="true">‹</button></div>
       <div class="side-label">COMMAND CENTER</div>
       <nav>
-        <a class="nav-item active" id="incidents-nav" href="#incidents"><img src="/dashboard-assets/sheet/incidents.png" alt="" /> Incidents</a>
-        <a class="nav-item" id="workflow-nav" href="#workflow"><img src="/dashboard-assets/sheet/workflow.png" alt="" /> Workflow</a>
-        <a class="nav-item" id="safety-nav" href="#safety"><img src="/dashboard-assets/sheet/safety.png" alt="" /> Safety policy</a>
+        <a class="nav-item active" id="incidents-nav" href="#incidents"><img src="/dashboard-assets/sheet/incidents.png" alt="" /><span class="nav-label">Incidents</span></a>
+        <a class="nav-item" id="workflow-nav" href="#workflow"><img src="/dashboard-assets/sheet/workflow.png" alt="" /><span class="nav-label">Workflow</span></a>
+        <a class="nav-item" id="safety-nav" href="#safety"><img src="/dashboard-assets/sheet/safety.png" alt="" /><span class="nav-label">Safety policy</span></a>
       </nav>
       <div class="side-spacer"></div>
-      <div class="system-card" id="node-card" role="button" tabindex="0" aria-label="Open SentinelOps Nodes"><img src="/dashboard-assets/sheet/button-workflow-layers.png" alt="" /><div><strong id="node-card-title">Demo environment</strong><small id="node-card-status">Local control plane</small></div></div>
-      <div class="version">SENTINELOPS v0.3 · ADK READY</div>
+      <div class="system-card" id="node-card" role="button" tabindex="0" aria-label="Open SentinelOps Nodes"><img src="/dashboard-assets/sheet/button-workflow-layers.png" alt="" /><div class="system-card-copy"><strong id="node-card-title">Cloud control plane</strong><small id="node-card-status">Loading runtime state…</small></div></div>
+      <div class="version">SENTINELOPS v0.4 · ADK LIVE</div>
     </aside>
 
     <main class="main" id="incidents">
-      <header class="topbar"><div><p class="eyebrow">AUTONOMOUS INCIDENT RESPONSE</p><h1>Incident command center</h1></div><div class="top-actions"><span class="mode-pill"><span class="dot"></span><span id="mode-label">DEMO MODE</span></span><button class="icon-button" id="settings-button" aria-label="Settings"><img src="/dashboard-assets/sheet/button-gear.png" alt="" /></button></div></header>
+      <header class="topbar"><div><p class="eyebrow">AUTONOMOUS INCIDENT RESPONSE</p><h1>Incident command center</h1></div><div class="top-actions"><span class="mode-pill"><span class="dot"></span><span id="mode-label">LIVE RUNTIME</span></span><button class="icon-button" id="settings-button" aria-label="Settings"><img src="/dashboard-assets/sheet/button-gear.png" alt="" /></button></div></header>
 
       <section class="metrics" aria-label="System metrics">
-        <div class="metric-card"><img class="metric-icon" src="/dashboard-assets/sheet/button-heartbeat.png" alt="" /><div><span class="metric-label">ACTIVE INCIDENTS</span><strong id="metric-active">—</strong><span class="metric-foot good">● Control plane ready</span></div></div>
-        <div class="metric-card"><img class="metric-icon" src="/dashboard-assets/sheet/button-flow.png" alt="" /><div><span class="metric-label">WORKFLOW STAGES</span><strong>06</strong><span class="metric-foot">Detect to report</span></div></div>
-        <div class="metric-card"><img class="metric-icon" src="/dashboard-assets/sheet/button-shield-check.png" alt="" /><div><span class="metric-label">AUTOMATION POLICY</span><strong>SAFE</strong><span class="metric-foot good">● Human approval enabled</span></div></div>
+        <div class="metric-card"><img class="metric-icon" src="/dashboard-assets/sheet/button-heartbeat.png" alt="" /><div><span class="metric-label">ACTIVE INCIDENTS</span><strong id="metric-active">—</strong><span class="metric-foot good" id="metric-active-foot">● Loading incident state</span></div></div>
+        <div class="metric-card"><img class="metric-icon" src="/dashboard-assets/sheet/button-flow.png" alt="" /><div><span class="metric-label">WORKFLOW STAGES</span><strong id="metric-workflow">—</strong><span class="metric-foot" id="metric-workflow-foot">Loading latest workflow</span></div></div>
+        <div class="metric-card"><img class="metric-icon" src="/dashboard-assets/sheet/button-shield-check.png" alt="" /><div><span class="metric-label">AUTOMATION POLICY</span><strong id="metric-policy">—</strong><span class="metric-foot good" id="metric-policy-foot">● Loading safety state</span></div></div>
       </section>
 
       <section class="workspace">
         <div class="panel create-panel">
           <div class="panel-heading"><div><p class="eyebrow">NEW EVENT</p><h2>Dispatch an incident</h2></div><img class="panel-icon" src="/dashboard-assets/sheet/button-add.png" alt="" /></div>
-          <p class="muted">Send a service signal to the Incident Commander. The demo workflow never mutates infrastructure.</p>
+          <p class="muted">Send a service signal to the Incident Commander. High-impact remediation requires explicit approval and is constrained by the configured allowlist.</p>
           <form id="incident-form">
             <label><span class="field-label">Service</span><span class="control-with-icon"><img src="/dashboard-assets/sheet/container.png" alt="" /><input id="service" value="demo-api" required /></span></label>
             <label><span class="field-label">Severity</span><span class="control-with-icon"><img src="/dashboard-assets/sheet/high.png" alt="" /><select id="severity"><option>high</option><option>critical</option><option>medium</option><option>low</option></select></span></label>
             <label>Incident summary<textarea id="summary" required>HTTP 500 rate exceeded after latest deployment</textarea></label>
-            <div class="form-actions"><button class="primary" type="submit"><span>Run incident analysis</span><span>→</span></button><button class="secondary" id="demo-button" type="button"><img src="/dashboard-assets/sheet/logs.png" alt="" /> Load demo scenario</button></div>
+            <div class="form-actions"><button class="primary" type="submit"><span>Run incident analysis</span><span>→</span></button><button class="secondary" id="demo-button" type="button"><img src="/dashboard-assets/sheet/logs.png" alt="" /> Load test scenario</button></div>
           </form>
           <div id="form-error" class="alert error hidden"></div>
         </div>
 
         <div class="panel result-panel" id="result-panel">
-          <div class="empty-state" id="empty-state"><div class="empty-orbit"><img src="/dashboard-assets/sheet/sparkle.png" alt="" /></div><h2>Awaiting an incident</h2><p>Dispatch a signal to see evidence, reasoning, safety checks, and verification appear here.</p></div>
+          <div class="empty-state" id="empty-state"><div class="empty-orbit"><img src="/dashboard-assets/sheet/sparkle.png" alt="" /></div><h2>Awaiting an incident</h2><p>Automatic detector events and manually dispatched signals appear here with evidence, reasoning, safety checks, remediation, verification, and final report state.</p></div>
           <div id="result-content" class="hidden">
             <div class="panel-heading result-heading"><div><p class="eyebrow">LIVE INVESTIGATION</p><h2 id="incident-title">Incident analysis</h2></div><span id="approval-badge" class="status-badge pending">PENDING</span></div>
             <div class="result-meta"><span id="incident-id"></span><span id="execution-mode"></span></div>
@@ -54,17 +55,17 @@
             </div>
             <div class="evidence-section"><span class="block-label">EVIDENCE COLLECTED</span><ul id="evidence-list"></ul></div>
             <div class="timeline-section" id="workflow"><div class="section-row"><span class="block-label">WORKFLOW TIMELINE</span><span id="timeline-count" class="muted"></span></div><div id="timeline" class="timeline"></div></div>
-            <div class="approval-section" id="safety"><div><span class="block-label">SAFETY GATE</span><p id="approval-note" class="muted"></p></div><div class="approval-actions"><input id="approval-comment" placeholder="Approval comment (optional)" /><button id="reject-button" class="danger" type="button">Reject</button><button id="approve-button" class="approve" type="button">Approve</button><button id="execute-button" class="execute" type="button">Execute safe action</button><button id="verify-button" class="verify" type="button">Run verification</button></div></div>
+            <div class="approval-section" id="safety"><div><span class="block-label">SAFETY GATE</span><p id="approval-note" class="muted"></p></div><div class="approval-actions"><input id="approval-comment" placeholder="Approval comment (optional)" /><button id="reject-button" class="danger" type="button">Reject</button><button id="approve-button" class="approve" type="button">Approve</button><div class="execution-targets hidden" id="execution-targets"><input id="target-revision" placeholder="Target Cloud Run revision, e.g. demo-api-00003-fqh" /><input id="target-region" value="europe-west1" placeholder="Cloud Run region" /></div><button id="execute-button" class="execute" type="button">Execute approved rollback</button><button id="verify-button" class="verify" type="button">Run health verification</button></div></div>
           </div>
         </div>
       </section>
-      <footer><span><img src="/dashboard-assets/sheet/shield-check.png" alt="" /> SentinelOps operates with explicit permission boundaries.</span><span>All demo actions are simulated · No production systems connected</span></footer>
+      <footer><span><img src="/dashboard-assets/sheet/shield-check.png" alt="" /> SentinelOps operates with explicit permission boundaries.</span><span id="footer-runtime">Live Cloud Run remediation enabled · Approval + verification required</span></footer>
     </main>
   </div>
   <div class="settings-backdrop hidden" id="settings-backdrop" aria-hidden="true">
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="settings-modal-header"><div><p class="eyebrow">CONTROL PLANE CONFIGURATION</p><h2 id="settings-title">Settings</h2></div><button class="settings-close" id="settings-close" type="button" aria-label="Close settings">×</button></div>
-      <p class="settings-intro">Manage non-secret SentinelOps runtime configuration. Backend changes are written to <code>.env</code> and apply after restarting the API.</p>
+      <p class="settings-intro" id="settings-intro">Inspect SentinelOps runtime configuration.</p>
       <form id="settings-form">
         <div class="settings-grid">
           <label>Operating mode<select id="settings-mode"><option value="demo">Demo mode</option><option value="gemini">Gemini / ADK</option></select></label>
@@ -80,7 +81,7 @@
         </div>
         <div class="settings-safety"><img src="/dashboard-assets/sheet/shield-check.png" alt="" /><div><strong>Human approval is enforced</strong><p>High-impact remediation cannot run without explicit approval. This safety boundary is read-only from the dashboard.</p></div><span class="locked-pill">LOCKED</span></div>
         <div class="settings-status hidden" id="settings-status" role="status"></div>
-        <div class="settings-footer"><span class="settings-runtime" id="settings-runtime">Loading runtime status…</span><div><button class="secondary" id="settings-cancel" type="button">Cancel</button><button class="primary settings-save" type="submit">Save configuration</button></div></div>
+        <div class="settings-footer"><span class="settings-runtime" id="settings-runtime">Loading runtime status…</span><div><button class="secondary" id="settings-cancel" type="button">Close</button><button class="primary settings-save" id="settings-save" type="submit">Save configuration</button></div></div>
       </form>
     </section>
   </div>
@@ -92,5 +93,6 @@
     </section>
   </div>
   <script src="/dashboard.js"></script>
+  <script src="/dashboard-assets/dashboard-live.js?v=20260819-3"></script>
 </body>
 </html>

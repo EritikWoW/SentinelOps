@@ -1,0 +1,145 @@
+.sidebar,
+.main {
+  transition: width .22s ease, flex-basis .22s ease, padding .22s ease;
+}
+
+.brand {
+  position: relative;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  top: 1px;
+  right: -5px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #1d3b55;
+  border-radius: 8px;
+  color: #9eb5c9;
+  background: #071523;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.sidebar-toggle:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: #0b1b2d;
+}
+
+.sidebar.collapsed {
+  width: 82px;
+  flex-basis: 82px;
+  padding-left: 12px;
+  padding-right: 12px;
+  overflow-x: hidden;
+}
+
+.sidebar.collapsed .brand {
+  min-height: 43px;
+  padding-bottom: 52px;
+}
+
+.sidebar.collapsed .brand-lockup,
+.sidebar.collapsed .side-label,
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .system-card-copy,
+.sidebar.collapsed .version {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+  right: 13px;
+  transform: rotate(180deg);
+}
+
+.sidebar.collapsed nav {
+  display: grid;
+  gap: 6px;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  gap: 0;
+  padding: 14px 10px;
+}
+
+.sidebar.collapsed .nav-item img {
+  width: 27px;
+  height: 27px;
+}
+
+.sidebar.collapsed .system-card {
+  justify-content: center;
+  padding: 10px;
+}
+
+.sidebar.collapsed .system-card img {
+  width: 38px;
+  height: 38px;
+}
+
+.metric-card[data-state="attention"] {
+  border-color: #72582c;
+  box-shadow: 0 22px 70px rgba(94, 61, 9, .12);
+}
+
+.metric-card[data-state="danger"] {
+  border-color: #71354a;
+  box-shadow: 0 22px 70px rgba(113, 32, 57, .13);
+}
+
+.metric-card[data-state="ok"] {
+  border-color: #1d4d4c;
+}
+
+.execution-targets {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(140px, .55fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.execution-targets input {
+  margin-top: 0;
+}
+
+.settings-save:disabled,
+#approve-button:disabled,
+#reject-button:disabled,
+#execute-button:disabled,
+#verify-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: 82px;
+    flex-basis: 82px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .sidebar .brand-lockup,
+  .sidebar .side-label,
+  .sidebar .nav-label,
+  .sidebar .system-card-copy,
+  .sidebar .version {
+    display: none;
+  }
+
+  .sidebar .nav-item {
+    justify-content: center;
+  }
+
+  .execution-targets {
+    grid-template-columns: 1fr;
+  }
+}
