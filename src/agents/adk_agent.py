@@ -16,9 +16,8 @@ from src.tools.logs import get_recent_logs
 from src.tools.process import get_process_status
 
 
-# Load the local secret file when the application starts. `.env.example` is
-# documentation only; credentials must live in the ignored `.env` file.
-load_dotenv(override=True)
+# Load local development settings without overriding Cloud Run environment values.
+load_dotenv(override=False)
 
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 
@@ -30,6 +29,22 @@ For high-impact or destructive actions set requires_human_approval to true.
 Only use evidence present in the incident input or supplied by another agent.
 The incident is not resolved until the verification plan is explicit.
 """.strip()
+
+
+def _configure_gemini_runtime() -> None:
+    """Configure ADK/Gen AI SDK to use Vertex AI with Application Default Credentials."""
+
+    project = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+    location = os.getenv("GOOGLE_CLOUD_LOCATION", "global").strip() or "global"
+    if not project:
+        raise RuntimeError("GOOGLE_CLOUD_PROJECT is required for Gemini mode")
+
+    # Google ADK uses the Google Gen AI SDK underneath. These environment values
+    # select Vertex AI, where Cloud Run authenticates with its attached service
+    # account through Application Default Credentials; no Gemini API key is needed.
+    os.environ["GOOGLE_CLOUD_PROJECT"] = project
+    os.environ["GOOGLE_CLOUD_LOCATION"] = location
+    os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "true"
 
 
 def _specialist(name: str, role: str) -> Agent:
@@ -80,7 +95,11 @@ class ADKIncidentAgent:
         self.mode = os.getenv("SENTINELOPS_MODE", "demo").strip().lower()
         if self.mode not in {"demo", "gemini"}:
             raise RuntimeError("SENTINELOPS_MODE must be either 'demo' or 'gemini'")
-        self.root_agent = build_root_agent() if self.mode == "gemini" else None
+        if self.mode == "gemini":
+            _configure_gemini_runtime()
+            self.root_agent = build_root_agent()
+        else:
+            self.root_agent = None
 
     def analyze(self, incident: IncidentCreate) -> str:
         """Run one isolated incident analysis and return the final JSON text."""
@@ -88,16 +107,6 @@ class ADKIncidentAgent:
         if self.mode == "demo":
             return json.dumps(_demo_analysis(incident), ensure_ascii=False)
 
-        if not os.getenv("GEMINI_API_KEY") and not os.getenv("GOOGLE_API_KEY"):
-            raise RuntimeError("GEMINI_API_KEY is not configured")
-
-        # google-genai/ADK reads GOOGLE_API_KEY for Gemini API-key auth. Keep the
-        # project-facing variable GEMINI_API_KEY while adapting it at the boundary.
-        if os.getenv("GEMINI_API_KEY"):
-            # ADK's Gemini model checks GOOGLE_API_KEY first. Make the project
-            # variable authoritative locally so an old shell variable cannot
-            # silently route requests through a different restricted key.
-            os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
         prompt = (
             "Analyze this incident and produce the required JSON response.\n"
             f"Service: {incident.service}\n"
@@ -111,12 +120,11 @@ class ADKIncidentAgent:
         try:
             return asyncio.run(self._run(prompt))
         except Exception as exc:
-            # Do not expose provider tracebacks or credential metadata through
-            # the API. The operator gets a useful remediation hint instead.
-            if "API_KEY_SERVICE_BLOCKED" in str(exc) or "403" in str(exc):
+            # Avoid leaking provider traces or credential metadata through the API.
+            if "PERMISSION_DENIED" in str(exc) or "403" in str(exc):
                 raise RuntimeError(
-                    "Gemini rejected the API key (403). Enable Generative Language API "
-                    "and allow it in the key's API restrictions."
+                    "Vertex AI rejected the request (403). Grant the Cloud Run runtime service account "
+                    "Vertex AI User and verify that aiplatform.googleapis.com is enabled."
                 ) from exc
             raise RuntimeError(f"Gemini request failed: {type(exc).__name__}") from exc
 

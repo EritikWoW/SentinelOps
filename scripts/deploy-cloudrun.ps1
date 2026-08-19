@@ -8,6 +8,7 @@ param(
     [ValidateSet("memory", "firestore")]
     [string]$Store = "memory",
     [string]$ServiceAccount = "sentinelops-runtime",
+    [string]$GoogleCloudLocation = "global",
     [switch]$EnablePubSub,
     [ValidateSet("pull", "push")]
     [string]$PubSubDeliveryMode = "push",
@@ -17,27 +18,21 @@ param(
     [string]$DeadLetterTopic = "sentinelops-dead-letter-events",
     [string]$PushServiceAccount = "sentinelops-pubsub-invoker",
     [string]$PushAudience = "",
-    [switch]$UseSecretManager,
-    [string]$GeminiSecret = "sentinelops-gemini-api-key",
     [switch]$RequireApiToken,
     [string]$ApiTokenSecret = "sentinelops-api-token"
 )
 
 $ErrorActionPreference = "Stop"
 
-if ($Mode -eq "gemini" -and -not $UseSecretManager) {
-    throw "Gemini mode requires -UseSecretManager so the API key is not placed in deployment arguments."
-}
-
 Write-Host "Configuring gcloud project: $ProjectId"
 gcloud config set project $ProjectId
-Write-Host "Enabling Cloud Run and Artifact Registry APIs"
-gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com
+Write-Host "Enabling Cloud Run, Artifact Registry, Cloud Build, and Vertex AI APIs"
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com aiplatform.googleapis.com
 Write-Host "Deploying $Service to Cloud Run in $Region"
 $pubsubEnabled = if ($EnablePubSub) { "true" } else { "false" }
 $authRequired = if ($RequireApiToken) { "true" } else { "false" }
 $pushServiceAccountEmail = "$PushServiceAccount@$ProjectId.iam.gserviceaccount.com"
-$envVars = "SENTINELOPS_MODE=$Mode,SENTINELOPS_STORE=$Store,SENTINELOPS_ENV=production,SENTINELOPS_AUTH_REQUIRED=$authRequired,PUBSUB_ENABLED=$pubsubEnabled,PUBSUB_DELIVERY_MODE=$PubSubDeliveryMode,PUBSUB_TOPIC=$IncomingTopic,PUBSUB_INTERNAL_TOPIC=$InternalTopic,PUBSUB_SUBSCRIPTION=$Subscription,PUBSUB_DEAD_LETTER_TOPIC=$DeadLetterTopic,PUBSUB_PUSH_SERVICE_ACCOUNT=$pushServiceAccountEmail,PUBSUB_PUSH_AUDIENCE=$PushAudience,FIRESTORE_DATABASE=(default),GOOGLE_CLOUD_PROJECT=$ProjectId,GOOGLE_CLOUD_LOCATION=$Region"
+$envVars = "SENTINELOPS_MODE=$Mode,SENTINELOPS_STORE=$Store,SENTINELOPS_ENV=production,SENTINELOPS_AUTH_REQUIRED=$authRequired,PUBSUB_ENABLED=$pubsubEnabled,PUBSUB_DELIVERY_MODE=$PubSubDeliveryMode,PUBSUB_TOPIC=$IncomingTopic,PUBSUB_INTERNAL_TOPIC=$InternalTopic,PUBSUB_SUBSCRIPTION=$Subscription,PUBSUB_DEAD_LETTER_TOPIC=$DeadLetterTopic,PUBSUB_PUSH_SERVICE_ACCOUNT=$pushServiceAccountEmail,PUBSUB_PUSH_AUDIENCE=$PushAudience,FIRESTORE_DATABASE=(default),GOOGLE_CLOUD_PROJECT=$ProjectId,GOOGLE_CLOUD_LOCATION=$GoogleCloudLocation,GOOGLE_GENAI_USE_VERTEXAI=true"
 $deployArgs = @(
     "run", "deploy", $Service,
     "--source", ".",
@@ -53,9 +48,6 @@ $deployArgs = @(
     "--service-account", "$ServiceAccount@$ProjectId.iam.gserviceaccount.com"
 )
 $secretBindings = @()
-if ($UseSecretManager) {
-    $secretBindings += "GEMINI_API_KEY=${GeminiSecret}:latest"
-}
 if ($RequireApiToken) {
     $secretBindings += "SENTINELOPS_API_TOKEN=${ApiTokenSecret}:latest"
 }
