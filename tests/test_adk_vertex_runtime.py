@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from src.agents.adk_agent import _configure_gemini_runtime, build_root_agent
+from src.agents.adk_agent import _configure_gemini_runtime, build_formatter_agent, build_root_agent
 from src.models.incident import IncidentAnalysis
 
 
@@ -34,7 +34,17 @@ def test_configure_gemini_runtime_requires_project(monkeypatch: pytest.MonkeyPat
         _configure_gemini_runtime()
 
 
-def test_root_agent_enforces_incident_analysis_schema() -> None:
+def test_root_agent_keeps_tools_without_output_schema() -> None:
     agent = build_root_agent()
 
+    assert agent.output_schema is None
+    assert len(agent.tools) == 3
+    assert len(agent.sub_agents) == 5
+
+
+def test_formatter_agent_enforces_schema_without_tools() -> None:
+    agent = build_formatter_agent()
+
     assert agent.output_schema is IncidentAnalysis
+    assert agent.tools == []
+    assert agent.sub_agents == []
