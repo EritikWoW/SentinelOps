@@ -3,6 +3,20 @@ import logging
 from src.services.event_bus import PubSubEventConsumer
 
 
+class FakePublishFuture:
+    def result(self, timeout: int | None = None) -> None:
+        return None
+
+
+class FakePublisher:
+    def __init__(self) -> None:
+        self.published: list[tuple[str, bytes, dict[str, str]]] = []
+
+    def publish(self, topic: str, data: bytes, **attrs: str) -> FakePublishFuture:
+        self.published.append((topic, data, attrs))
+        return FakePublishFuture()
+
+
 class FakeMessage:
     def __init__(self, data: bytes, message_id: str = "msg-1") -> None:
         self.data = data
@@ -20,6 +34,8 @@ class FakeMessage:
 def build_consumer() -> PubSubEventConsumer:
     consumer = object.__new__(PubSubEventConsumer)
     consumer._subscription_path = "projects/test/subscriptions/sentinelops-incoming-sub"
+    consumer._dead_letter_topic_path = "projects/test/topics/sentinelops-dead-letter-events"
+    consumer._dead_letter_publisher = FakePublisher()
     return consumer
 
 
@@ -35,16 +51,20 @@ def test_pubsub_consumer_acks_valid_message() -> None:
     assert message.nacked is False
 
 
-def test_pubsub_consumer_logs_and_nacks_invalid_message(caplog) -> None:
+def test_pubsub_consumer_quarantines_and_acks_invalid_message(caplog) -> None:
     consumer = build_consumer()
     message = FakeMessage(b"not-json", message_id="bad-message-42")
 
-    with caplog.at_level(logging.ERROR, logger="src.services.event_bus"):
+    with caplog.at_level(logging.WARNING, logger="src.services.event_bus"):
         consumer._process_message(lambda payload: None, message)
 
-    assert message.acked is False
-    assert message.nacked is True
-    assert "Failed to process inbound Pub/Sub event; message will be retried" in caplog.text
+    assert message.acked is True
+    assert message.nacked is False
+    assert "Rejected permanently invalid inbound Pub/Sub event" in caplog.text
+    assert "Quarantined invalid inbound Pub/Sub event" in caplog.text
+    assert len(consumer._dead_letter_publisher.published) == 1
+
     record = next(record for record in caplog.records if record.levelno == logging.ERROR)
     assert record.pubsub_message_id == "bad-message-42"
     assert record.pubsub_subscription.endswith("sentinelops-incoming-sub")
+    assert record.pubsub_dead_letter_topic.endswith("sentinelops-dead-letter-events")
