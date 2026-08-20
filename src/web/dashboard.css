@@ -87,7 +87,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .shell.sidebar-collapsed .sidebar { width: 84px; flex-basis: 84px; padding-inline: 13px; }
 .shell.sidebar-collapsed .brand { justify-content: center; padding-bottom: 52px; }
 .shell.sidebar-collapsed .brand-lockup, .shell.sidebar-collapsed .side-label, .shell.sidebar-collapsed .nav-label, .shell.sidebar-collapsed .system-card-copy, .shell.sidebar-collapsed .version { display: none; }
-.shell.sidebar-collapsed .sidebar-toggle { margin: 0; }
+.shell.sidebar-collapsed .sidebar-toggle { align-self: center; margin: 0; transform: none; }
 .shell.sidebar-collapsed .nav-item { justify-content: center; padding-inline: 0; }
 .shell.sidebar-collapsed .nav-item img { width: 28px; height: 28px; }
 .shell.sidebar-collapsed .system-card { justify-content: center; padding: 9px; }
