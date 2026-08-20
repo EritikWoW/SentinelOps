@@ -1,0 +1,291 @@
+/* Viewport-fit overrides for the persistent command-center layout. */
+
+.main {
+  max-width: none;
+  padding: 26px clamp(24px, 3vw, 42px) 16px;
+}
+
+.topbar {
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.topbar > div:first-child {
+  min-width: 0;
+}
+
+.topbar h1 {
+  font-size: 29px;
+}
+
+.top-actions {
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 12px;
+  padding-right: 2px;
+}
+
+.runtime-stack {
+  flex: 0 0 auto;
+}
+
+.icon-button {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+}
+
+.icon-button img {
+  width: 29px;
+  height: 29px;
+}
+
+.metrics {
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.metric-card {
+  min-height: 108px;
+  gap: 17px;
+  padding: 16px 18px;
+}
+
+.metric-icon {
+  flex-basis: 56px;
+  width: 56px;
+  height: 56px;
+  padding: 11px;
+  border-radius: 12px;
+}
+
+.metric-card strong {
+  margin: 2px 0 2px;
+  font-size: 25px;
+}
+
+.page-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.page-view.active {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.monitoring-strip {
+  flex: 0 0 auto;
+  margin-bottom: 12px;
+  padding: 11px 15px;
+}
+
+.monitoring-strip strong {
+  margin-top: 3px;
+  font-size: 14px;
+}
+
+.monitoring-strip p {
+  margin-top: 2px;
+}
+
+#view-incidents {
+  overflow: hidden;
+}
+
+#view-incidents .workspace-live {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+#view-incidents .result-panel,
+#view-incidents .incident-history-panel {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.incident-history-panel {
+  min-height: 0;
+}
+
+.history-list {
+  max-height: none;
+}
+
+.empty-state {
+  min-height: 100%;
+}
+
+.manual-panel {
+  flex: 0 0 auto;
+  max-height: min(430px, calc(100dvh - 260px));
+  overflow-y: auto;
+}
+
+.view-heading {
+  flex: 0 0 auto;
+  margin: 0 0 12px;
+}
+
+.view-heading h2 {
+  margin: 2px 0 5px;
+  font-size: 24px;
+}
+
+.view-heading p {
+  margin: 0;
+}
+
+#view-workflow {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 3px;
+}
+
+#view-workflow .control-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin-bottom: 10px;
+}
+
+#view-workflow .control-card {
+  min-height: 92px;
+  padding: 11px 13px;
+}
+
+#view-workflow .control-card p {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+#view-workflow .stream-panel {
+  flex: 1 1 170px;
+  min-height: 170px;
+  padding: 14px 18px;
+  overflow: hidden;
+}
+
+#view-workflow .event-list {
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+#view-safety,
+#view-nodes {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 3px;
+}
+
+.central-policy {
+  gap: 9px;
+}
+
+.central-policy .policy-row {
+  min-height: 88px;
+  padding-block: 12px;
+}
+
+footer {
+  flex: 0 0 auto;
+  margin-top: 10px;
+}
+
+@media (max-height: 800px) and (min-width: 901px) {
+  .main {
+    padding-top: 18px;
+    padding-bottom: 10px;
+  }
+
+  .topbar {
+    margin-bottom: 12px;
+  }
+
+  .topbar h1 {
+    margin-top: 3px;
+    font-size: 26px;
+  }
+
+  .metrics {
+    margin-bottom: 10px;
+  }
+
+  .metric-card {
+    min-height: 94px;
+    padding: 13px 16px;
+  }
+
+  .metric-icon {
+    flex-basis: 50px;
+    width: 50px;
+    height: 50px;
+  }
+
+  .monitoring-strip {
+    padding-block: 9px;
+  }
+
+  #view-workflow .control-card {
+    min-height: 80px;
+  }
+
+  #view-workflow .stream-panel {
+    min-height: 140px;
+  }
+}
+
+@media (max-width: 1180px) {
+  #view-workflow .control-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .main {
+    padding: 20px 18px 12px;
+    overflow-y: auto;
+  }
+
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .top-actions {
+    margin-left: auto;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .page-view,
+  .page-view.active,
+  #view-incidents,
+  #view-incidents .workspace-live {
+    overflow: visible;
+  }
+
+  #view-incidents .result-panel,
+  #view-incidents .incident-history-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  #view-workflow .control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #view-workflow .stream-panel {
+    min-height: 220px;
+  }
+}
