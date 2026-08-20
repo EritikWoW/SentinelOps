@@ -26,6 +26,15 @@ def _bool(value: str | None) -> bool:
     return (value or "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _live_remediation_enabled(mode: str) -> bool:
+    allowed_services = {
+        item.strip()
+        for item in os.getenv("SENTINELOPS_REMEDIATION_ALLOWED_SERVICES", "").split(",")
+        if item.strip()
+    }
+    return mode == "gemini" and bool(allowed_services) and bool(os.getenv("GOOGLE_CLOUD_PROJECT", "").strip())
+
+
 def current_settings() -> SettingsResponse:
     mode = os.getenv("SENTINELOPS_MODE", "demo").strip().lower()
     if mode not in {"demo", "gemini"}:
@@ -45,6 +54,7 @@ def current_settings() -> SettingsResponse:
         location=os.getenv("GOOGLE_CLOUD_LOCATION", "global"),
         environment=os.getenv("SENTINELOPS_ENV", "development"),
         api_key_configured=bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")),
+        live_remediation_enabled=_live_remediation_enabled(mode),
     )
 
 
@@ -81,9 +91,6 @@ def save_settings(update: SettingsUpdate, env_path: str = ".env") -> SettingsRes
             output.append(f"{key}={value}")
     path.write_text("\n".join(output).rstrip() + "\n", encoding="utf-8")
     response = current_settings()
-    # The running process deliberately keeps its current backend wiring until
-    # restart. Return the persisted values, however, so the UI reflects what
-    # was actually written instead of showing stale process values.
     response.mode = update.mode
     response.model = update.model
     response.store = update.store
@@ -94,6 +101,7 @@ def save_settings(update: SettingsUpdate, env_path: str = ".env") -> SettingsRes
     response.project = update.project
     response.location = update.location
     response.environment = update.environment
+    response.live_remediation_enabled = _live_remediation_enabled(update.mode)
     response.restart_required = True
     response.save_target = str(path)
     return response
