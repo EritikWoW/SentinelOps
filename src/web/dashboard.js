@@ -8,7 +8,7 @@ function setSidebarCollapsed(collapsed) {
   shell.classList.toggle("sidebar-collapsed", collapsed);
   toggle.setAttribute("aria-expanded", String(!collapsed));
   toggle.setAttribute("aria-label", collapsed ? "Expand sidebar" : "Collapse sidebar");
-  toggle.querySelector("img").src = `/dashboard-assets/sheet/${collapsed ? "sidebar-expand" : "sidebar-collapse"}.png`;
+  toggle.querySelector("img").src = `/dashboard-assets/sheet/${collapsed ? "sidebar-expand" : "sidebar-collapse"}.png?v=20260820-2`;
   localStorage.setItem("sentinelops.sidebarCollapsed", String(collapsed));
 }
 
@@ -273,15 +273,11 @@ $("control-body").addEventListener("click", async (event) => {
     controlPanel.close();
   }
 });
-$("sidebar-toggle").addEventListener("click", () => {
-  setSidebarCollapsed(!document.querySelector(".shell").classList.contains("sidebar-collapsed"));
-});
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (!$ ("settings-backdrop").classList.contains("hidden")) settings.close();
   if (!$ ("control-backdrop").classList.contains("hidden")) controlPanel.close();
 });
-setSidebarCollapsed(localStorage.getItem("sentinelops.sidebarCollapsed") === "true");
 updateMetrics();
 refreshNodeStatus();
 window.setInterval(refreshNodeStatus, 15000);

@@ -65,7 +65,7 @@ SMALL = {
 # assets intended for window chrome and the collapsible sidebar control.
 CONTROLS = {
     "sidebar-collapse": (63, 915, 117, 971),
-    "sidebar-expand": (176, 915, 230, 971),
+    "sidebar-expand": (190, 915, 244, 971),
     "window-minimize": (353, 915, 409, 971),
     "window-maximize": (475, 915, 531, 971),
     "window-close": (600, 915, 656, 971),

@@ -264,14 +264,23 @@
     const sidebar = $("sidebar");
     const toggle = $("sidebar-toggle");
     if (!sidebar || !toggle) return;
-    const saved = localStorage.getItem("sentinelops.sidebar.collapsed") === "true";
+    const shell = document.querySelector(".shell");
+    const savedValue = localStorage.getItem("sentinelops.sidebarCollapsed");
+    const saved = savedValue === null
+      ? localStorage.getItem("sentinelops.sidebar.collapsed") === "true"
+      : savedValue === "true";
+    shell.classList.toggle("sidebar-collapsed", saved);
     sidebar.classList.toggle("collapsed", saved);
     toggle.setAttribute("aria-expanded", String(!saved));
     toggle.setAttribute("aria-label", saved ? "Expand sidebar" : "Collapse sidebar");
+    toggle.querySelector("img").src = `/dashboard-assets/sheet/${saved ? "sidebar-expand" : "sidebar-collapse"}.png?v=20260820-2`;
     toggle.addEventListener("click", () => {
       const collapsed = sidebar.classList.toggle("collapsed");
+      shell.classList.toggle("sidebar-collapsed", collapsed);
       toggle.setAttribute("aria-expanded", String(!collapsed));
       toggle.setAttribute("aria-label", collapsed ? "Expand sidebar" : "Collapse sidebar");
+      toggle.querySelector("img").src = `/dashboard-assets/sheet/${collapsed ? "sidebar-expand" : "sidebar-collapse"}.png?v=20260820-2`;
+      localStorage.setItem("sentinelops.sidebarCollapsed", String(collapsed));
       localStorage.setItem("sentinelops.sidebar.collapsed", String(collapsed));
     });
   }

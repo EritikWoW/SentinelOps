@@ -57,7 +57,7 @@
   left: 50%;
   right: auto;
   margin: 0;
-  transform: translateX(-50%) rotate(180deg);
+  transform: translateX(-50%);
 }
 
 .sidebar.collapsed nav {
