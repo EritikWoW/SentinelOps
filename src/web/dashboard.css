@@ -239,9 +239,41 @@ textarea { min-height: 94px; resize: vertical; }
 .event-item:hover, .event-item:focus-visible { background: #0a1d2d; outline: none; }
 .event-item strong { color: #b3d3e7; font: 10px var(--font-mono); text-transform: uppercase; }
 .event-item small { color: var(--muted); font-size: 10px; }
-.event-detail { margin-top: 10px; padding: 11px; border: 1px solid #1d3b55; border-radius: var(--radius-sm); background: #04101d; }
-.event-detail strong { color: #7df5df; font: 10px var(--font-mono); text-transform: uppercase; }
-.event-detail pre { max-height: 150px; margin: 8px 0 0; overflow: auto; color: #a7c6d9; font: 10px/1.5 var(--font-mono); white-space: pre-wrap; }
+.event-detail { display: grid; gap: 16px; min-height: 0; }
+.event-modal-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.event-modal-meta strong { color: #e8f5ff; font: 12px var(--font-mono); text-transform: uppercase; }
+.event-modal-meta small { color: var(--muted); font: 10px var(--font-mono); }
+.event-modal-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.event-modal-stat { min-width: 0; padding: 10px 11px; border: 1px solid #1d3b55; border-radius: 7px; background: #061322; }
+.event-modal-stat span { display: block; color: #66839b; font: 9px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.event-modal-stat strong { display: block; margin-top: 5px; overflow: hidden; color: #d9ecf7; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.event-modal-section { min-width: 0; padding: 12px; border: 1px solid #1d3b55; border-radius: 8px; background: #061322; }
+.event-modal-section .section-row { align-items: center; gap: 12px; }
+.event-modal-section p { margin: 8px 0 0; color: #b4c9d9; font-size: 12px; line-height: 1.55; }
+.event-modal-list { display: grid; gap: 7px; margin: 9px 0 0; padding: 0; list-style: none; }
+.event-modal-list li { padding-left: 11px; border-left: 2px solid #24668d; color: #b4c9d9; font-size: 11px; line-height: 1.5; }
+.event-modal-list li strong { color: #7df5df; font: 9px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.event-modal-timeline { display: grid; gap: 7px; margin-top: 9px; }
+.event-modal-timeline-item { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: 1px solid rgba(38, 79, 105, .55); }
+.event-modal-timeline-item:first-child { border-top: 0; padding-top: 0; }
+.event-modal-timeline-item strong { color: #7df5df; font: 9px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.event-modal-timeline-item span { color: #b4c9d9; font-size: 11px; line-height: 1.45; }
+.event-modal-raw { margin: 0; max-height: 250px; overflow: auto; color: #a7c6d9; font: 10px/1.55 var(--font-mono); white-space: pre-wrap; word-break: break-word; }
+.modal-backdrop { position: fixed; z-index: 21; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(0, 5, 14, .76); backdrop-filter: blur(8px); }
+.manual-modal, .event-modal { width: min(760px, 100%); max-height: min(720px, calc(100dvh - 48px)); overflow: hidden; padding: 24px; border: 1px solid #24506b; border-radius: 13px; background: #071523; box-shadow: 0 28px 90px rgba(0, 0, 0, .58); }
+.manual-modal { width: min(680px, 100%); }
+.modal-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.manual-modal h2, .event-modal h2 { margin: 4px 0 0; font-size: 24px; }
+.modal-intro { margin: 14px 0 20px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.manual-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.manual-form label { margin: 0; }
+.manual-summary { grid-column: 1 / -1; }
+.manual-summary textarea { min-height: 112px; }
+.manual-form .form-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.manual-form .form-actions .primary { flex: 1 1 260px; }
+.manual-form .form-actions .secondary { flex: 0 1 auto; }
+.manual-modal #form-error { margin-top: 14px; }
+.event-modal .event-detail { max-height: calc(min(720px, 100dvh - 48px) - 105px); overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; }
 .policy-list { display: grid; gap: 10px; }
 .policy-row { display: flex; align-items: center; gap: 12px; padding: 13px; border: 1px solid #1d3b55; border-radius: var(--radius-sm); background: #061322; }
 .policy-row img { width: 28px; height: 28px; object-fit: contain; }

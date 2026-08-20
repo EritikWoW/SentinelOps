@@ -169,6 +169,75 @@ function renderHistory() {
   }).join("") : `<p class="muted history-empty">No matching incidents.</p>`;
 }
 
+function eventPayload(record) {
+  return record?.payload && typeof record.payload === "object" ? record.payload : {};
+}
+
+function eventText(value, fallback = "—") {
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value);
+}
+
+function eventList(items) {
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const text = typeof item === "string" ? item : item?.content || item?.detail || JSON.stringify(item);
+    return `<li>${escapeHtml(text)}</li>`;
+  }).join("");
+}
+
+function openEventDetail(record) {
+  const payload = eventPayload(record);
+  const analysis = payload.analysis && typeof payload.analysis === "object" ? payload.analysis : {};
+  const evidence = analysis.evidence || payload.evidence || [];
+  const timeline = analysis.timeline || [];
+  const verificationPlan = analysis.verification_plan || [];
+  const severity = payload.severity || analysis.risk_level;
+  const meta = [
+    ["Service", payload.service],
+    ["Severity", severity],
+    ["Incident", payload.incident_id],
+    ["Approval", payload.approval_status],
+  ];
+  const sections = [];
+  if (payload.summary || analysis.incident_summary) {
+    sections.push(`<section class="event-modal-section"><div class="section-row"><span class="block-label">INCIDENT CONTEXT</span><span class="muted">${escapeHtml(eventText(payload.source, "event"))}</span></div><p>${escapeHtml(payload.summary || analysis.incident_summary)}</p></section>`);
+  }
+  if (analysis.root_cause_hypothesis || analysis.remediation_action || analysis.remediation_status) {
+    sections.push(`<section class="event-modal-section"><div class="section-row"><span class="block-label">ANALYSIS</span><span class="muted">${escapeHtml(eventText(analysis.risk_level, "unrated"))}</span></div>${analysis.root_cause_hypothesis ? `<p><strong>Root cause hypothesis</strong><br>${escapeHtml(analysis.root_cause_hypothesis)}</p>` : ""}${analysis.remediation_action ? `<p><strong>Remediation</strong><br>${escapeHtml(analysis.remediation_action)} · ${escapeHtml(eventText(analysis.remediation_status, "planned"))}</p>` : ""}</section>`);
+  }
+  if (timeline.length) {
+    sections.push(`<section class="event-modal-section"><div class="section-row"><span class="block-label">WORKFLOW TIMELINE</span><span class="muted">${timeline.length} stages</span></div><div class="event-modal-timeline">${timeline.map((item) => `<div class="event-modal-timeline-item"><strong>${escapeHtml(eventText(item.stage))}</strong><span>${escapeHtml(eventText(item.detail))}</span></div>`).join("")}</div></section>`);
+  }
+  if (verificationPlan.length) {
+    sections.push(`<section class="event-modal-section"><div class="section-row"><span class="block-label">VERIFICATION PLAN</span><span class="muted">${verificationPlan.length} checks</span></div><ul class="event-modal-list">${eventList(verificationPlan)}</ul></section>`);
+  }
+  if (evidence.length) {
+    sections.push(`<section class="event-modal-section"><div class="section-row"><span class="block-label">EVIDENCE</span><span class="muted">${evidence.length} records</span></div><ul class="event-modal-list">${evidence.map((item) => `<li>${item?.type ? `<strong>${escapeHtml(item.type)}</strong><br>` : ""}${escapeHtml(typeof item === "string" ? item : item?.content || JSON.stringify(item))}</li>`).join("")}</ul></section>`);
+  }
+  const raw = escapeHtml(JSON.stringify(payload, null, 2));
+  $("event-detail").innerHTML = `<div class="event-modal-meta"><strong>${escapeHtml(eventText(record.event_type, "event"))} · ${escapeHtml(eventText(record.event_id))}</strong><small>${escapeHtml(new Date(record.occurred_at || payload.created_at || Date.now()).toLocaleString())}</small></div><div class="event-modal-grid">${meta.map(([label, value]) => `<div class="event-modal-stat"><span>${label}</span><strong title="${escapeHtml(eventText(value))}">${escapeHtml(eventText(value))}</strong></div>`).join("")}</div>${sections.join("")}<section class="event-modal-section"><div class="section-row"><span class="block-label">RAW PAYLOAD</span><span class="muted">JSON</span></div><pre class="event-modal-raw">${raw}</pre></section>`;
+  $("event-backdrop").classList.remove("hidden");
+  $("event-backdrop").setAttribute("aria-hidden", "false");
+  $("event-close").focus();
+}
+
+function closeEventDetail() {
+  $("event-backdrop").classList.add("hidden");
+  $("event-backdrop").setAttribute("aria-hidden", "true");
+}
+
+function openManualIncident() {
+  $("manual-backdrop").classList.remove("hidden");
+  $("manual-backdrop").setAttribute("aria-hidden", "false");
+  setError("");
+  $("service").focus();
+}
+
+function closeManualIncident() {
+  $("manual-backdrop").classList.add("hidden");
+  $("manual-backdrop").setAttribute("aria-hidden", "true");
+}
+
 function renderWorkflow() {
   const incident = state.incident || state.incidents.find(isActiveIncident) || null;
   const timeline = incident?.analysis?.timeline || [];
@@ -266,7 +335,7 @@ async function createIncident(service, severity, summary) {
   const incident = await requestJson("/incidents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ service, severity, summary, source: "manual" }) });
   state.autoSelected = false;
   renderIncident(incident);
-  $("manual-panel").classList.add("hidden");
+  closeManualIncident();
   await refreshLiveState();
 }
 
@@ -342,13 +411,14 @@ $("workflow-nav").addEventListener("click", (event) => { event.preventDefault();
 $("safety-nav").addEventListener("click", (event) => { event.preventDefault(); switchView("safety"); });
 $("node-card").addEventListener("click", () => switchView("nodes"));
 $("node-card").addEventListener("keydown", (event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); switchView("nodes"); } });
-$("manual-toggle").addEventListener("click", () => { $("manual-panel").classList.remove("hidden"); $("service").focus(); });
-$("manual-close").addEventListener("click", () => $("manual-panel").classList.add("hidden"));
+$("manual-toggle").addEventListener("click", openManualIncident);
+$("manual-close").addEventListener("click", closeManualIncident);
+$("manual-backdrop").addEventListener("click", (event) => { if (event.target === $("manual-backdrop")) closeManualIncident(); });
 $("demo-button").addEventListener("click", () => { $("service").value = "demo-api"; $("severity").value = "high"; $("summary").value = "HTTP 500 rate exceeded after latest deployment"; $("summary").focus(); });
 $("incident-form").addEventListener("submit", async (event) => { event.preventDefault(); setError(""); try { await createIncident($("service").value, $("severity").value, $("summary").value); } catch (error) { setError(error.message); } });
 $("history-search").addEventListener("input", renderHistory); $("history-status").addEventListener("change", renderHistory);
 $("history-list").addEventListener("click", (event) => { const target = event.target.closest("[data-incident-id]"); if (target) loadIncident(target.dataset.incidentId, true).catch((error) => setError(error.message)); });
-$("event-list").addEventListener("click", (event) => { const target = event.target.closest("[data-event-id]"); if (!target) return; const record = state.events.find((item) => item.event_id === target.dataset.eventId); if (!record) return; $("event-detail").classList.remove("hidden"); $("event-detail").innerHTML = `<strong>${escapeHtml(record.event_type)} · ${escapeHtml(record.event_id)}</strong><pre>${escapeHtml(JSON.stringify(record.payload, null, 2))}</pre>`; });
+$("event-list").addEventListener("click", (event) => { const target = event.target.closest("[data-event-id]"); if (!target) return; const record = state.events.find((item) => item.event_id === target.dataset.eventId); if (record) openEventDetail(record); });
 $("approve-button").addEventListener("click", () => decide("approve").catch((error) => setError(error.message)));
 $("reject-button").addEventListener("click", () => decide("reject").catch((error) => setError(error.message)));
 $("execute-button").addEventListener("click", () => executeRemediation().catch((error) => setError(error.message)));
@@ -356,7 +426,9 @@ $("verify-button").addEventListener("click", () => verifyRemediation().catch((er
 $("settings-button").addEventListener("click", () => settings.open().catch((error) => console.error(error)));
 $("settings-close").addEventListener("click", settings.close); $("settings-cancel").addEventListener("click", settings.close); $("settings-form").addEventListener("submit", settings.save);
 $("settings-backdrop").addEventListener("click", (event) => { if (event.target === $("settings-backdrop")) settings.close(); });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("settings-backdrop").classList.contains("hidden")) settings.close(); });
+$("event-close").addEventListener("click", closeEventDetail);
+$("event-backdrop").addEventListener("click", (event) => { if (event.target === $("event-backdrop")) closeEventDetail(); });
+document.addEventListener("keydown", (event) => { if (event.key !== "Escape") return; if (!$("event-backdrop").classList.contains("hidden")) closeEventDetail(); else if (!$("manual-backdrop").classList.contains("hidden")) closeManualIncident(); else if (!$("settings-backdrop").classList.contains("hidden")) settings.close(); });
 
 switchView("incidents");
 refreshLiveState();
