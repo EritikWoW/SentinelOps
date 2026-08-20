@@ -1,113 +1,128 @@
 # SentinelOps
 
-Autonomous AI incident commander for detecting, investigating, remediating, and verifying service incidents.
+SentinelOps is an autonomous AI incident commander for detecting, investigating, remediating, verifying, and reporting service incidents.
 
-SentinelOps is being built for the **All Things Agentic Hackathon** in the **Taskmaster** category. The project uses Google Agent Development Kit (ADK), Gemini, and Google Cloud to run an event-driven incident-response workflow that takes action instead of only producing recommendations.
+Built for the **All Things Agentic Hackathon** in the **Taskmaster** category, SentinelOps combines Google Agent Development Kit (ADK), Gemini, Cloud Run, Cloud Logging, Pub/Sub, Firestore, and a safety-gated remediation executor.
+
+> An incident is not resolved when the agent proposes a solution. It is resolved when the system proves that the service is healthy again.
 
 ## Core workflow
 
 `Detect -> Investigate -> Decide -> Remediate -> Verify -> Report`
 
-A typical demo scenario is a faulty deployment that causes elevated HTTP 500 errors. SentinelOps receives the incident event, gathers logs and deployment context, correlates the failure with recent code changes, selects a safe remediation action, verifies recovery, and produces an incident timeline.
+The live demo intentionally breaks a Cloud Run service, automatically detects the resulting HTTP 5xx signal, lets Gemini investigate the incident, pauses at a human approval gate, performs a real rollback to a known healthy Cloud Run revision, verifies recovery with a real health check, and writes a final incident report.
 
-## SentinelOps architecture
+## What is implemented
 
-SentinelOps consists of two logical parts:
+- **Automatic failure detection** from Cloud Run request logs through Cloud Logging Log Router.
+- **Authenticated Pub/Sub push ingestion** into the SentinelOps control plane.
+- **Event correlation** to suppress repeated detector events during the same incident window.
+- **Google ADK + Gemini investigation** with specialist agents and bounded read-only tools.
+- **Structured incident analysis** including evidence, root-cause hypothesis, risk, remediation plan, and verification plan.
+- **Human approval gate** for high-impact remediation.
+- **Allowlisted live Cloud Run rollback** to an explicit target revision.
+- **Real health verification** before an incident can be marked resolved.
+- **Deterministic final report stage** after verification.
+- **Firestore persistence** for incident state.
+- **Pub/Sub workflow events** for control-plane observability.
+- **Live dashboard** with current incidents, workflow progress, safety state, Node state, runtime mode, approval controls, execution controls, and verification controls.
+- **SentinelOps Node** for local log, health, process, heartbeat, and normalized-event collection.
 
-1. **SentinelOps Control Plane** — FastAPI, Google ADK, Gemini, Cloud Run,
-   Pub/Sub, Firestore, dashboard, policies, and incident orchestration.
-2. **SentinelOps Node** — a lightweight local collector for log files,
-   healthchecks, process state, heartbeats, and approved local actions.
-
-The Node detects problems locally and sends only normalized trigger events with
-bounded evidence to the Control Plane. It does not stream every log line to
-Gemini.
+## Live architecture
 
 ```mermaid
 flowchart LR
-  App[Local application] --> Logs[Log file]
-  App --> Health[Health endpoint]
-  Logs --> Node[SentinelOps Node]
-  Health --> Node
-  Node --> Detect[Lightweight detection rules]
-  Detect --> Events[Normalized event]
-  Events --> API[Control Plane API]
-  API --> Coordinator[ADK Incident Commander]
-  Coordinator --> Gemini[Gemini]
-  Coordinator --> Gate{Safety policy}
-  Gate --> Approval[Human approval]
-  Approval --> Tools[Typed tools]
-  Tools --> Verify[Verification]
-  Verify --> Report[Incident report]
+  User[Real HTTP request] --> Service[Cloud Run service]
+  Service -->|HTTP 5xx| Logging[Cloud Logging]
+  Logging --> Router[Log Router sink]
+  Router --> Topic[Pub/Sub incoming topic]
+  Topic -->|Authenticated push| API[SentinelOps Cloud Run]
+
+  API --> Correlate[Incident correlation]
+  Correlate --> ADK[ADK Incident Commander]
+  ADK --> Gemini[Gemini]
+  ADK --> Tools[Read-only evidence tools]
+
+  Gemini --> Decision[Structured incident analysis]
+  Decision --> Gate{Safety policy}
+  Gate -->|High risk| Approval[Human approval]
+  Approval --> Executor[Allowlisted Cloud Run rollback]
+  Executor --> Service
+  Service --> Verify[Real /health verification]
+  Verify --> Report[Final incident report]
+
+  API --> Firestore[(Firestore)]
+  API --> Events[Pub/Sub workflow events]
 ```
 
-## Planned architecture
+The system is closed-loop: detection, investigation, action, and proof of recovery are part of one persisted incident lifecycle.
 
-- **FastAPI / Cloud Run** - incident webhook and API surface
-- **Pub/Sub** - event ingestion and fan-out
-- **Google ADK** - coordinator and specialized agents
-- **Gemini 3.5 Flash** - reasoning, correlation, summarization, and decision support
-- **Cloud Logging** - operational evidence
-- **Firestore** - incident state, execution history, and memory
-- **GitHub API** - commit, diff, repository, and pull-request context
+## Agent architecture
 
-Specialized agents:
+The ADK control plane uses an Incident Commander plus specialist agents for:
 
-- Incident Coordinator
-- Log Analysis Agent
-- Infrastructure Agent
-- Code Analysis Agent
-- Remediation Agent
-- Verification Agent
+- log analysis;
+- infrastructure context;
+- code and deployment context;
+- remediation planning;
+- verification planning.
+
+The commander performs investigation with tools first, then a separate formatter agent produces the structured `IncidentAnalysis` response. This avoids mixing tool/function-call output with the final schema contract.
 
 ## Safety model
 
-SentinelOps uses permission-scoped tools and risk-aware action policies.
+SentinelOps does not give the model unrestricted infrastructure access.
 
-Low-risk operations such as reading logs, analyzing metrics, and running health checks can be autonomous. High-impact or destructive actions must be blocked or require explicit human approval.
+Read-only inspection can run autonomously. High-impact remediation remains behind explicit policy checks and human approval. Live Cloud Run rollback is additionally constrained by:
 
-## Repository status
+- `SENTINELOPS_REMEDIATION_ALLOWED_SERVICES`;
+- an explicit target revision;
+- revision/service ownership validation;
+- an explicit execution confirmation;
+- real post-remediation health verification.
 
-This repository is an active hackathon build. It contains a deterministic local
-demo workflow and a Google ADK live workflow behind the same API contract. The
-demo mode is the safe default so development and judging rehearsals do not
-consume Gemini credits or execute infrastructure changes.
+A blocked, rejected, or unverified action cannot be represented as a successfully resolved incident.
 
-## Implementation status
+## Live demo flow
 
-Implemented: local SentinelOps Node, log/health/process collectors, normalized
-event ingestion, structured evidence, Node heartbeat registry, typed read-only
-ADK tools, Safety Policy, unsupported remediation adapters, health-based
-verification, local broken-service demo, and dashboard observability.
+The primary demo service is `demo-api` with one known healthy revision and one intentionally broken revision.
 
-Planned: host-specific process/service restart adapters, production rollback
-execution, and deeper Cloud Monitoring, Prometheus, Sentry, and Grafana
-integrations. These remain behind the safety boundary until explicitly
-configured.
+1. Route traffic to broken v2.
+2. Request `/health` and receive HTTP 500.
+3. Cloud Logging emits a request log with `httpRequest.status >= 500`.
+4. Log Router publishes the entry to Pub/Sub.
+5. Pub/Sub pushes the event to SentinelOps.
+6. SentinelOps correlates the event and creates one incident.
+7. Gemini investigates and proposes rollback.
+8. Human approval authorizes remediation.
+9. SentinelOps routes 100% of Cloud Run traffic to the known healthy revision.
+10. `/health` returns HTTP 200.
+11. SentinelOps records `Verify` and `Report` and marks the incident `resolved`.
 
-## Requirements
+## Runtime stack
 
 - Python 3.11+
-- Docker (optional, recommended for reproducibility)
-- A Gemini API key or Vertex AI configuration
-- Google Cloud project for Cloud Run / Pub/Sub / Firestore integration
+- FastAPI
+- Google Agent Development Kit (ADK)
+- Gemini 3.5 Flash through Vertex AI ADC
+- Google Cloud Run
+- Cloud Logging / Log Router
+- Pub/Sub
+- Firestore
+- Google Cloud Run Admin API
+- GitHub API
+- Docker
 
 ## Local setup
-
-### 1. Clone the repository
 
 ```bash
 git clone https://github.com/EritikWoW/SentinelOps.git
 cd SentinelOps
-```
-
-### 2. Create a virtual environment
-
-Linux / macOS:
-
-```bash
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+cp .env.example .env
 ```
 
 Windows PowerShell:
@@ -115,71 +130,23 @@ Windows PowerShell:
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-### 3. Install dependencies
-
-```bash
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-```
-
-### 4. Configure environment variables
-
-```bash
-cp .env.example .env
-```
-
-On Windows:
-
-```powershell
 Copy-Item .env.example .env
 ```
 
-For local development, keep the default offline mode:
+The safe local default is deterministic demo mode:
 
 ```env
 SENTINELOPS_MODE=demo
-```
-
-To use the real Google ADK coordinator after Gemini billing is available, set:
-
-```env
-SENTINELOPS_MODE=gemini
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-3.5-flash
-```
-
-### 5. Run the API
-
-```bash
-uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
-```
-
-Then verify:
-
-```bash
-curl http://localhost:8080/health
-```
-
-Expected response:
-
-```json
-{"status":"ok","service":"sentinelops"}
-```
-
-## Docker reproducible test
-
-Build:
-
-```bash
-docker build -t sentinelops .
+SENTINELOPS_STORE=memory
+PUBSUB_ENABLED=false
 ```
 
 Run:
 
 ```bash
-docker run --rm -p 8080:8080 --env-file .env sentinelops
+uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
 Verify:
@@ -188,276 +155,178 @@ Verify:
 curl http://localhost:8080/health
 ```
 
-## Incident API smoke test
+Expected:
 
-Start the API, then send a synthetic incident:
-
-```bash
-curl -X POST http://localhost:8080/incidents \
-  -H "Content-Type: application/json" \
-  -d '{"service":"demo-api","severity":"high","summary":"HTTP 500 rate exceeded threshold"}'
+```json
+{"status":"ok","service":"sentinelops"}
 ```
 
-The endpoint runs the configured incident commander. In `demo` mode it produces
-a deterministic six-stage run (`detect -> investigate -> decide -> remediate ->
-verify -> report`) with a simulated remediation and timeline. In `gemini` mode
-the same request is delegated to the Google ADK coordinator and specialist
-agents. After approval, the demo exposes a safe local remediation action that
-changes only the stored incident state; no production infrastructure is
-mutated.
+Open the dashboard at `http://127.0.0.1:8080/`.
 
-The local agent graph can also be inspected directly:
+## Gemini / Vertex AI mode
 
-```powershell
-.\.venv\Scripts\python.exe -c "from src.agents.adk_agent import build_root_agent; print(build_root_agent().name)"
-```
+Cloud Run uses Application Default Credentials through its service identity; no `GOOGLE_APPLICATION_CREDENTIALS` file is required in the container.
 
-Example demo response fields include `execution_mode`, `analysis.timeline`,
-`analysis.remediation_status`, and `analysis.execution_notes`. This makes the
-agent behavior observable without pretending that a rollback or restart really
-changed infrastructure.
-
-### Incident lifecycle endpoints
-
-The local MVP stores analyzed incidents in an in-memory repository and exposes
-the approval boundary used by the future Firestore-backed executor:
-
-```text
-POST /incidents                         create and analyze an incident
-GET  /incidents?limit=25                 list recent incidents for observability
-GET  /incidents/{incident_id}            retrieve the stored incident
-POST /incidents/{incident_id}/approval   approve or reject remediation
-POST /incidents/{incident_id}/execute    execute the safe demo action after approval
-POST /incidents/{incident_id}/verify     record the post-action verification result
-GET  /events                             inspect recent local workflow events
-POST /events/{event_id}/replay           replay one local event with a new attempt id
-POST /nodes/heartbeat                    register a SentinelOps Node heartbeat
-GET  /nodes                              list Node liveness records
-GET  /nodes/{node_id}                    inspect one Node
-```
-
-### SentinelOps Node (Phase 1)
-
-The first Node implementation is a regular Python process and can later be
-wrapped as a Windows Service, Linux daemon, or container. Start it with:
-
-```powershell
-python -m src.node.agent --config node.yaml
-```
-
-The current Node supports tail-style log rules, HTTP healthcheck failure
-thresholds, process state checks, heartbeat reporting, and normalized event
-submission. It does not execute production remediation yet. Typed remediation
-adapters return explicit unsupported results when no host adapter is configured.
-The Control Plane also exposes `POST /incidents/{incident_id}/verify/health` for
-real post-action health verification; only a passing check marks an incident
-resolved. The phase details are tracked in
-[`docs/development-plan.md`](docs/development-plan.md).
-
-The reproducible Node demo is documented in [`docs/node.md`](docs/node.md).
-It starts a local broken service, triggers a real FATAL log and health failure,
-and lets the Node create the incident automatically without a manual
-`POST /incidents`.
-
-The dashboard Workflow panel uses the incident history and event stream to
-reopen prior analyses and inspect the latest local lifecycle events. History can
-be searched by service, severity, or incident id and filtered by approval
-status. Selecting an incident restores its approval state and keeps the
-existing safety controls available for the next permitted step. Selecting an
-event expands its JSON payload for debugging and demo observability.
-The sidebar environment card also reads `/nodes` and shows the latest online
-Node heartbeat when a Node is connected.
-
-Approval example:
-
-```powershell
-$approval = @{ decision = "approve"; comment = "Approved for demo rehearsal." } | ConvertTo-Json
-Invoke-RestMethod `
-  -Uri http://127.0.0.1:8080/incidents/INCIDENT_ID/approval `
-  -Method Post -ContentType "application/json" -Body $approval
-```
-
-An approval is recorded in the timeline. In demo mode, execution is explicit,
-repeat-safe, and limited to local incident state; the store is intentionally isolated in `src/services/incident_store.py`
-so it can be replaced by Firestore while preserving the API contract.
-
-### Cloud persistence and events
-
-The local defaults are deliberately safe:
+Typical runtime configuration:
 
 ```env
-SENTINELOPS_STORE=memory
-PUBSUB_ENABLED=false
-```
-
-For a restart-persistent offline development run, use the JSON store instead:
-
-```env
-SENTINELOPS_STORE=file
-SENTINELOPS_DATA_FILE=.local-data/incidents.json
-```
-
-The JSON store uses atomic replacement on writes and is ignored by Git. It is
-intended for local development; Firestore is the multi-instance backend.
-
-For a Google Cloud deployment, configure the same service with:
-
-```env
+SENTINELOPS_MODE=gemini
+GOOGLE_GENAI_USE_VERTEXAI=true
+GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
+GOOGLE_CLOUD_LOCATION=global
+GEMINI_MODEL=gemini-3.5-flash
 SENTINELOPS_STORE=firestore
+FIRESTORE_DATABASE=(default)
 PUBSUB_ENABLED=true
-GOOGLE_CLOUD_PROJECT=sentinelops-505805
+PUBSUB_DELIVERY_MODE=push
 PUBSUB_TOPIC=sentinelops-incoming-events
 PUBSUB_INTERNAL_TOPIC=sentinelops-internal-events
-PUBSUB_SUBSCRIPTION=sentinelops-incoming-sub
-SENTINELOPS_AUTH_REQUIRED=true
-FIRESTORE_DATABASE=(default)
+SENTINELOPS_REMEDIATION_ALLOWED_SERVICES=demo-api
 ```
 
-The application then persists incident documents in the `incidents` Firestore
-collection and publishes `incident.created` and `incident.approval_decided`
-and `incident.remediation_executed` messages to Pub/Sub. The Firestore and Pub/Sub clients are created only when
-their backends are explicitly enabled, so local demo mode does not require
-Google credentials.
+The Cloud Run runtime service account needs only the permissions required by the configured deployment. Vertex AI access and Cloud Run remediation permissions should be granted to the runtime identity rather than embedded as static keys.
 
-When `SENTINELOPS_STORE=firestore`, Node records and event history are also
-stored in the `nodes` and `events` collections. Inbound Pub/Sub is a separate
-`EventConsumer` and is enabled only when both `PUBSUB_ENABLED=true` and
-`PUBSUB_SUBSCRIPTION` are configured; the local `EventPublisher` does not imply
-that inbound consumption is active.
+## Cloud Logging detector
 
-### Dashboard
+The included setup script configures a project-level Log Router sink that exports new Cloud Run request logs with HTTP 5xx responses for the target service.
 
-Open `http://127.0.0.1:8080/dashboard` after starting the API. The dashboard
-shows the six-stage workflow, evidence, approval boundary, and the safe demo
-action. The architecture diagram used for the hackathon submission is in
-[`docs/architecture.md`](docs/architecture.md).
-The implementation sequence and acceptance criteria are tracked in
-[`docs/development-plan.md`](docs/development-plan.md).
+```bash
+export GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
+bash scripts/setup-cloud-logging-detector.sh
+```
 
-The gear button opens the operational Settings panel. It reads the active
-runtime configuration without exposing credentials and can persist only
-non-secret values to `.env` (`SENTINELOPS_MODE`, model, store, Pub/Sub, Google
-Cloud location, and environment). API keys are never returned by `GET /settings`
-and are never rewritten by `POST /settings`. Backend changes intentionally take
-effect after an API restart; the panel reports this explicitly. Human approval
-remains enforced and live infrastructure mutation is disabled in this build.
+The detector uses a request-log filter equivalent to:
+
+```text
+resource.type="cloud_run_revision"
+AND resource.labels.service_name="demo-api"
+AND httpRequest.status>=500
+```
+
+The script also grants the sink writer identity Pub/Sub Publisher on the incoming topic.
 
 ## Cloud Run deployment
-
-Once the Google Cloud project is configured:
 
 ```bash
 gcloud auth login
 gcloud config set project YOUR_PROJECT_ID
-gcloud run deploy sentinelops --source . --region europe-west1
+
+gcloud run deploy sentinelops \
+  --source . \
+  --region=europe-west1 \
+  --allow-unauthenticated
 ```
 
-After deployment, record the generated `.run.app` URL for the Devpost hosted-project field and capture the Cloud Run dashboard/logs for the demo video.
+The public dashboard and API are served from the same Cloud Run service.
 
-The same flow is reproducible from Windows PowerShell:
+## Demo API
 
-```powershell
-.\scripts\deploy-cloudrun.ps1 -ProjectId sentinelops-505805
-.\scripts\smoke-cloudrun.ps1 -BaseUrl https://YOUR_SERVICE-REGION.a.run.app
-.\scripts\verify-cloudrun.ps1 -ProjectId sentinelops-505805 -Service sentinelops -Region europe-west1
-```
+The repository includes `demo-api`, a deterministic Cloud Run target used to demonstrate rollback.
 
-The deployment script intentionally starts in `demo` mode with the in-memory
-store and Pub/Sub disabled. This gives a safe public demo first; Firestore and
-Pub/Sub can be enabled later with a service account and explicit environment
-configuration.
-
-Before using Docker or gcloud, validate the cloud package locally:
-
-```powershell
-.\scripts\validate-cloud-config.ps1
-```
-
-Prepare the Google Cloud resources with an explicit two-step flow. The first
-command is plan-only and does not change the project; add `-Apply` only after
-reviewing the printed commands:
-
-```powershell
-.\scripts\bootstrap-gcp.ps1 -ProjectId sentinelops-505805 -CreateSecret
-.\scripts\bootstrap-gcp.ps1 -ProjectId sentinelops-505805 -CreateSecret -Apply
-```
-
-The bootstrap creates/enables Firestore, Pub/Sub topic and subscription, a
-dedicated Cloud Run service account, least-privilege runtime roles, and an
-optional Secret Manager container. It never prints or uploads the Gemini key.
-
-For a Gemini Cloud Run deployment, the script requires Secret Manager instead
-of accepting an API key in command-line arguments:
-
-```powershell
-.\scripts\deploy-cloudrun.ps1 -ProjectId sentinelops-505805 -Mode gemini -UseSecretManager
-```
-
-Cloud Run probes can use `/health` for liveness and `/ready` for readiness.
-After deployment, `verify-cloudrun.ps1` performs a read-only operational check
-of the service URL, dedicated service account, health/readiness endpoints, safe
-runtime settings, and Gemini secret wiring. It never prints the secret value.
-
-## Reproducible testing checklist
-
-A judge or reviewer should be able to validate the current scaffold with:
+Healthy deployment:
 
 ```bash
-git clone https://github.com/EritikWoW/SentinelOps.git
-cd SentinelOps
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn src.main:app --host 0.0.0.0 --port 8080
-curl http://localhost:8080/health
+bash scripts/deploy-demo-api.sh healthy
 ```
 
-Expected result: HTTP 200 with the SentinelOps health payload. The incident
-smoke test should return HTTP 202 and `execution_mode: "demo"` without needing
-an API key. Switch to `SENTINELOPS_MODE=gemini` only for a live Gemini run.
+Broken deployment:
 
-For the incident endpoint, use the smoke-test request shown above and verify that the API returns an accepted incident object and a generated incident id.
+```bash
+bash scripts/deploy-demo-api.sh broken
+```
+
+The broken revision returns HTTP 500 from `/health` and `/work`; the healthy revision returns HTTP 200.
+
+## Incident lifecycle API
+
+```text
+POST /incidents                           manually create and analyze an incident
+GET  /incidents?limit=25                  list recent incidents
+GET  /incidents/{incident_id}             retrieve one incident
+POST /incidents/{incident_id}/approval    approve or reject remediation
+POST /incidents/{incident_id}/execute     execute approved allowlisted remediation
+POST /incidents/{incident_id}/verify      record an explicit verification result
+POST /incidents/{incident_id}/verify/health
+                                         run real HTTP health verification
+GET  /events                              inspect workflow events
+POST /events                              ingest one normalized detector event
+POST /events/{event_id}/replay            replay one recorded event
+POST /nodes/heartbeat                     register a SentinelOps Node heartbeat
+GET  /nodes                               list Node state
+GET  /nodes/{node_id}                     inspect one Node
+GET  /settings                            inspect safe runtime configuration
+```
+
+Mutating control-plane routes can be protected with `SENTINELOPS_AUTH_REQUIRED=true` and `SENTINELOPS_API_TOKEN`.
+
+## Dashboard
+
+The root dashboard is a live control-plane view rather than a static demo page. It reads runtime data from `/incidents`, `/settings`, and `/nodes`, auto-refreshes operational state, and exposes only actions supported by the backend.
+
+The dashboard includes:
+
+- active incident count;
+- latest workflow progress;
+- automation/safety state;
+- incident evidence and root-cause hypothesis;
+- approval and rejection controls;
+- explicit Cloud Run rollback target revision + region;
+- real health verification;
+- workflow/event history;
+- Node state;
+- runtime mode/environment state;
+- collapsible navigation.
+
+Production settings are presented as read-only because durable Cloud Run configuration is deployment-managed.
+
+## SentinelOps Node
+
+Start a local Node with:
+
+```bash
+python -m src.node.agent --config node.yaml
+```
+
+The Node can monitor local logs, health endpoints, process state, and heartbeats and send normalized bounded evidence to the central control plane. It does not stream every log line to Gemini.
+
+See [`docs/node.md`](docs/node.md) for the reproducible Node demo.
+
+## Tests
+
+```bash
+python -m pytest -q
+```
+
+CI runs the automated test suite for pull requests.
 
 ## Project structure
 
 ```text
 SentinelOps/
-├── README.md
-├── .env.example
-├── .gitignore
-├── Dockerfile
-├── .dockerignore
-├── requirements.txt
-├── docs/
-│   └── architecture.md
-├── scripts/
-│   ├── deploy-cloudrun.ps1
-│   └── smoke-cloudrun.ps1
+├── demo/                       # deterministic healthy/broken Cloud Run target
+├── docs/                       # architecture and implementation notes
+├── scripts/                    # cloud/bootstrap/detector/demo helpers
 ├── src/
-│   ├── main.py
-│   ├── agents/
-│   │   ├── adk_agent.py
-│   │   ├── coordinator.py
-│   │   ├── log_agent.py
-│   │   ├── infrastructure_agent.py
-│   │   ├── code_agent.py
-│   │   ├── remediation_agent.py
-│   │   └── verification_agent.py
-│   └── models/
-│       └── incident.py
+│   ├── agents/                 # ADK commander and specialist agents
+│   ├── models/                 # incident/event/settings contracts
+│   ├── node/                   # SentinelOps Node
+│   ├── policy/                 # safety policy
+│   ├── services/               # stores, Pub/Sub, Cloud Run executor, verification
+│   ├── web/                    # live dashboard
+│   └── main.py                 # FastAPI control plane
 └── tests/
-    └── test_health.py
 ```
 
-## Hackathon deliverables
+## Hackathon proof points
 
-- Working Gemini + ADK agent workflow
-- Deterministic offline demo workflow
-- Observable incident timeline and safe remediation status
-- Google Cloud deployment
-- Public source repository
-- Reproducible README instructions
-- Architecture diagram
-- Approximately 4-minute demo video
-- Live incident -> analysis -> remediation -> verification scenario
+SentinelOps demonstrates that an agentic incident-response system can go beyond recommendations while retaining explicit safety boundaries:
+
+- **Real failure** — an actual Cloud Run revision returns HTTP 500.
+- **Real event** — Cloud Logging and Pub/Sub create the incident automatically.
+- **Real agent** — Google ADK + Gemini investigate the failure.
+- **Real safety gate** — high-risk remediation stops for human approval.
+- **Real action** — SentinelOps changes Cloud Run traffic to the approved healthy revision.
+- **Real verification** — the service must return HTTP 200 before resolution.
+- **Real report** — the completed workflow records a final incident report.
+
+That closed loop is the core of SentinelOps.
