@@ -93,6 +93,22 @@
 #view-nodes .node-grid { margin-top: 8px; }
 .empty-view { padding: 30px; }
 
+/* Focused modal surfaces keep large event payloads and manual testing out of the page flow. */
+.manual-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.manual-form .manual-summary { grid-column: 1 / -1; }
+.manual-form .form-actions { grid-column: 1 / -1; }
+.event-modal .event-detail { max-height: calc(min(720px, 100dvh - 48px) - 105px); }
+
+@media (max-width: 700px) {
+  .modal-backdrop { padding: 12px; }
+  .manual-modal, .event-modal { max-height: calc(100dvh - 24px); padding: 17px; }
+  .manual-modal h2, .event-modal h2 { font-size: 21px; }
+  .manual-form { grid-template-columns: 1fr; }
+  .manual-form .manual-summary, .manual-form .form-actions { grid-column: 1; }
+  .event-modal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .event-modal-timeline-item { grid-template-columns: 72px minmax(0, 1fr); }
+}
+
 .settings-save:disabled,
 #approve-button:disabled,
 #reject-button:disabled,
