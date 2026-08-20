@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SentinelOps · Incident Command</title>
   <link rel="stylesheet" href="/dashboard.css?v=20260820-1" />
-  <link rel="stylesheet" href="/dashboard-assets/dashboard-live.css?v=20260820-2" />
+  <link rel="stylesheet" href="/dashboard-assets/dashboard-live.css?v=20260820-3" />
 </head>
 <body>
   <div class="shell">
@@ -23,7 +23,7 @@
     </aside>
 
     <main class="main" id="incidents">
-      <header class="topbar"><div><p class="eyebrow">AUTONOMOUS INCIDENT RESPONSE</p><h1>Incident command center</h1></div><div class="top-actions"><span class="mode-pill"><span class="dot"></span><span id="mode-label">LIVE RUNTIME</span></span><button class="icon-button" id="settings-button" aria-label="Settings"><img src="/dashboard-assets/sheet/gear.png" alt="" /></button></div></header>
+      <header class="topbar"><div><p class="eyebrow">AUTONOMOUS INCIDENT RESPONSE</p><h1>Incident command center</h1></div><div class="top-actions"><div class="runtime-stack"><span class="mode-pill"><span class="dot"></span><span id="mode-label">LIVE RUNTIME</span></span><span class="last-updated" id="last-updated">Waiting for live state…</span></div><button class="icon-button" id="settings-button" aria-label="Settings"><img src="/dashboard-assets/sheet/gear.png" alt="" /></button></div></header>
 
       <section class="metrics" aria-label="System metrics">
         <div class="metric-card"><img class="sheet-control metric-icon" src="/dashboard-assets/sheet/heartbeat.png" alt="" /><div><span class="metric-label">ACTIVE INCIDENTS</span><strong id="metric-active">—</strong><span class="metric-foot good" id="metric-active-foot">● Loading incident state</span></div></div>
@@ -47,7 +47,7 @@
         <div class="panel result-panel" id="result-panel">
           <div class="empty-state" id="empty-state"><div class="empty-orbit"><img src="/dashboard-assets/sheet/sparkle.png" alt="" /></div><h2>Awaiting an incident</h2><p>Automatic detector events and manually dispatched signals appear here with evidence, reasoning, safety checks, remediation, verification, and final report state.</p></div>
           <div id="result-content" class="hidden">
-            <div class="panel-heading result-heading"><div><p class="eyebrow">LIVE INVESTIGATION</p><h2 id="incident-title">Incident analysis</h2></div><span id="approval-badge" class="status-badge pending">PENDING</span></div>
+            <div class="panel-heading result-heading"><div><p class="eyebrow">LIVE INVESTIGATION</p><h2 id="incident-title">Incident analysis</h2></div><div class="result-badges"><span id="workflow-state" class="workflow-state waiting">WAITING</span><span id="approval-badge" class="status-badge pending">PENDING</span></div></div>
             <div class="result-meta"><span id="incident-id"></span><span id="execution-mode"></span></div>
             <div class="analysis-grid">
               <div class="analysis-block"><span class="block-label">ROOT CAUSE HYPOTHESIS</span><p id="root-cause"></p></div>
@@ -55,6 +55,7 @@
             </div>
             <div class="evidence-section"><span class="block-label">EVIDENCE COLLECTED</span><ul id="evidence-list"></ul></div>
             <div class="timeline-section" id="workflow"><div class="section-row"><span class="block-label">WORKFLOW TIMELINE</span><span id="timeline-count" class="muted"></span></div><div id="timeline" class="timeline"></div></div>
+            <div class="report-section hidden" id="report-section"><div class="section-row"><span class="block-label">INCIDENT REPORT</span><span class="report-status" id="report-status">FINAL</span></div><p id="report-detail"></p></div>
             <div class="approval-section" id="safety"><div><span class="block-label">SAFETY GATE</span><p id="approval-note" class="muted"></p></div><div class="approval-actions"><input id="approval-comment" placeholder="Approval comment (optional)" /><button id="reject-button" class="danger" type="button">Reject</button><button id="approve-button" class="approve" type="button">Approve</button><div class="execution-targets hidden" id="execution-targets"><input id="target-revision" placeholder="Target Cloud Run revision, e.g. demo-api-00003-fqh" /><input id="target-region" value="europe-west1" placeholder="Cloud Run region" /></div><button id="execute-button" class="execute" type="button">Execute approved rollback</button><button id="verify-button" class="verify" type="button">Run health verification</button></div></div>
           </div>
         </div>
@@ -93,6 +94,6 @@
     </section>
   </div>
   <script src="/dashboard.js?v=20260820-2"></script>
-  <script src="/dashboard-assets/dashboard-live.js?v=20260820-4"></script>
+  <script src="/dashboard-assets/dashboard-live.js?v=20260820-5"></script>
 </body>
 </html>
