@@ -22,10 +22,47 @@
     return payload;
   }
 
+  function deriveWorkflowState(incident) {
+    if (!incident) return { label: "WAITING", state: "waiting" };
+    const analysis = incident.analysis || {};
+    const timeline = analysis.timeline || [];
+    const completed = new Set(timeline.filter((item) => item.status === "completed").map((item) => item.stage));
+
+    if (incident.status === "resolved" || analysis.verification_status === "passed") return { label: "RESOLVED", state: "resolved" };
+    if (incident.status === "remediation_failed" || analysis.verification_status === "failed") return { label: "FAILED", state: "failed" };
+    if (analysis.remediation_status === "executed") return { label: "VERIFYING", state: "verifying" };
+    if (incident.approval_status === "approved") return { label: "AUTHORIZED", state: "authorized" };
+    if (incident.approval_status === "rejected") return { label: "REJECTED", state: "rejected" };
+    if (incident.approval_status === "pending") return { label: "AWAITING APPROVAL", state: "approval" };
+    if (completed.has("decide")) return { label: "DECIDED", state: "deciding" };
+    if (completed.has("investigate")) return { label: "DECIDING", state: "deciding" };
+    if (completed.has("detect")) return { label: "INVESTIGATING", state: "investigating" };
+    return { label: "DETECTING", state: "detecting" };
+  }
+
+  function updateIncidentPresentation(incident) {
+    const workflow = deriveWorkflowState(incident);
+    const workflowBadge = $("workflow-state");
+    if (workflowBadge) {
+      workflowBadge.textContent = workflow.label;
+      workflowBadge.className = `workflow-state ${workflow.state}`;
+    }
+
+    const reportEvent = incident?.analysis?.timeline?.find((item) => item.stage === "report" && item.status === "completed");
+    const reportSection = $("report-section");
+    if (reportSection) reportSection.classList.toggle("hidden", !reportEvent);
+    if ($("report-detail")) $("report-detail").textContent = reportEvent?.detail || "";
+    if ($("report-status")) {
+      $("report-status").textContent = incident?.status === "resolved" ? "RESOLVED" : "FINAL";
+      $("report-status").className = `report-status ${incident?.status === "resolved" ? "resolved" : ""}`;
+    }
+  }
+
   function render(incident) {
     if (!incident) return;
     if (typeof window.renderIncident === "function") window.renderIncident(incident);
     syncActionControls(incident);
+    updateIncidentPresentation(incident);
   }
 
   function completedStages(incident) {
@@ -57,8 +94,9 @@
     const completed = completedStages(latest);
     if ($("metric-workflow")) $("metric-workflow").textContent = latest ? `${completed}/6` : "0/6";
     if ($("metric-workflow-foot")) {
+      const state = deriveWorkflowState(latest);
       $("metric-workflow-foot").textContent = latest
-        ? `${latest.service} · ${latest.status}`
+        ? `${latest.service} · ${state.label.toLowerCase()}`
         : "No workflow currently recorded";
     }
     setMetricState("metric-workflow", latest && latest.status === "remediation_failed" ? "danger" : "ok");
@@ -103,6 +141,20 @@
     }
   }
 
+  function markRefreshSuccess() {
+    const element = $("last-updated");
+    if (!element) return;
+    element.textContent = `Live · updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+    element.classList.remove("stale");
+  }
+
+  function markRefreshFailure() {
+    const element = $("last-updated");
+    if (!element) return;
+    element.textContent = "Live refresh unavailable";
+    element.classList.add("stale");
+  }
+
   async function refreshLiveState() {
     try {
       const [incidents, runtime, nodes] = await Promise.all([
@@ -125,8 +177,10 @@
           ? online.map((node) => `${node.node_id} · ${node.platform}`).join(" · ")
           : `${runtime.mode} · ${runtime.store} · ${runtime.environment}`;
       }
+      markRefreshSuccess();
     } catch (_) {
       if ($("metric-active-foot")) $("metric-active-foot").textContent = "● Runtime refresh unavailable";
+      markRefreshFailure();
     }
   }
 
@@ -189,6 +243,12 @@
       const targetRevision = $("target-revision")?.value.trim() || inferTargetRevision(incident);
       const region = $("target-region")?.value.trim() || "europe-west1";
       if (!targetRevision) throw new Error("Enter the explicit healthy Cloud Run target revision before executing rollback");
+
+      const confirmed = window.confirm(
+        `Execute approved rollback?\n\nService: ${incident.service}\nTarget revision: ${targetRevision}\nRegion: ${region}\n\nThis will change live Cloud Run traffic.`
+      );
+      if (!confirmed) return;
+
       const updated = await requestJson(`/incidents/${encodeURIComponent(incident.incident_id)}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -294,7 +354,11 @@
 
   const incidentId = $("incident-id");
   if (incidentId) new MutationObserver(() => window.setTimeout(async () => {
-    try { syncActionControls(await currentIncident()); } catch (_) { /* no incident selected */ }
+    try {
+      const incident = await currentIncident();
+      syncActionControls(incident);
+      updateIncidentPresentation(incident);
+    } catch (_) { /* no incident selected */ }
   }, 0)).observe(incidentId, { childList: true, characterData: true, subtree: true });
 
   refreshLiveState();
