@@ -11,6 +11,7 @@ ExecutionMode = Literal["demo", "gemini"]
 RemediationStatus = Literal["planned", "simulated", "executed", "blocked"]
 ApprovalStatus = Literal["not_required", "pending", "approved", "rejected"]
 VerificationStatus = Literal["pending", "passed", "failed"]
+IncidentStatus = Literal["accepted", "analyzed", "resolved", "remediation_failed", "archived"]
 
 
 class TimelineEvent(BaseModel):
@@ -69,7 +70,7 @@ class IncidentAnalysis(BaseModel):
 
 class IncidentResponse(BaseModel):
     incident_id: str
-    status: Literal["accepted", "analyzed", "resolved", "remediation_failed"] = "accepted"
+    status: IncidentStatus = "accepted"
     service: str
     severity: Severity
     summary: str
