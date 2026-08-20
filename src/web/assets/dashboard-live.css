@@ -54,8 +54,10 @@
 }
 
 .sidebar.collapsed .sidebar-toggle {
-  right: 13px;
-  transform: rotate(180deg);
+  left: 50%;
+  right: auto;
+  margin: 0;
+  transform: translateX(-50%) rotate(180deg);
 }
 
 .sidebar.collapsed nav {
@@ -133,6 +135,13 @@
   .sidebar .system-card-copy,
   .sidebar .version {
     display: none;
+  }
+
+  .sidebar .sidebar-toggle {
+    left: 50%;
+    right: auto;
+    margin: 0;
+    transform: translateX(-50%) rotate(180deg);
   }
 
   .sidebar .nav-item {
