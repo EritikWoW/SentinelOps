@@ -53,7 +53,6 @@ const source = fs.readFileSync(sourcePath, "utf8");
 
 const registered = [];
 const fetchCalls = [];
-const listeners = {};
 
 function element() {
   return {
@@ -211,7 +210,9 @@ vm.runInContext(source, context, { filename: sourcePath });
         capture_output=True,
         text=True,
     )
-    return json.loads(completed.stdout)
+    payload_lines = [line for line in completed.stdout.splitlines() if line.strip().startswith("{")]
+    assert payload_lines, f"WebMCP harness produced no JSON payload: {completed.stdout!r}"
+    return json.loads(payload_lines[-1])
 
 
 def test_webmcp_runtime_registers_exact_bounded_tool_set() -> None:
