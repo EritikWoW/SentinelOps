@@ -83,10 +83,73 @@ function updateMetrics() {
   setMetricState("metric-policy", automation.state);
 }
 
+function reconcileIncidentExecutionState(incident) {
+  if (!incident) return;
+  const analysis = incident.analysis || {};
+  const remediationStatus = analysis.remediation_status || "planned";
+  const verificationStatus = analysis.verification_status || "pending";
+  const note = $("approval-note");
+
+  if (note) {
+    if (verificationStatus === "passed") {
+      note.textContent = "Recovery verification passed. The remediation is confirmed healthy.";
+    } else if (verificationStatus === "failed") {
+      note.textContent = "Recovery verification failed. The incident remains unresolved.";
+    } else if (remediationStatus === "executed") {
+      note.textContent = "Approved remediation has executed. Run health verification to confirm recovery.";
+    }
+  }
+
+  if (remediationStatus === "executed") {
+    const badge = $("approval-badge");
+    if (badge && verificationStatus === "pending") {
+      badge.textContent = "EXECUTED";
+      badge.className = "status-badge executed";
+    }
+  }
+}
+
+function reconcileHistoryExecutionState() {
+  const incidentsById = new Map((state.incidents || []).map((incident) => [incident.incident_id, incident]));
+  document.querySelectorAll(".history-item[data-incident-id]").forEach((button) => {
+    const incident = incidentsById.get(button.dataset.incidentId);
+    if (!incident) return;
+    const analysis = incident.analysis || {};
+    const badge = button.querySelector(".status-badge");
+    if (!badge || incident.status === "resolved" || incident.status === "archived") return;
+
+    if (analysis.verification_status === "failed") {
+      badge.textContent = "verify failed";
+      badge.className = "status-badge rejected";
+    } else if (analysis.remediation_status === "executed") {
+      badge.textContent = analysis.verification_status === "pending" ? "verifying" : "executed";
+      badge.className = "status-badge executed";
+    }
+  });
+}
+
+const baseRenderIncident = renderIncident;
+renderIncident = function renderIncidentWithConsistentState(incident) {
+  baseRenderIncident(incident);
+  reconcileIncidentExecutionState(incident);
+};
+
+const baseRenderHistory = renderHistory;
+renderHistory = function renderHistoryWithConsistentState() {
+  baseRenderHistory();
+  reconcileHistoryExecutionState();
+};
+
 // dashboard.js starts the refresh loop before this file loads. Re-render once so
-// the new semantics are visible immediately; later refreshes call this override.
+// the new semantics are visible immediately; later refreshes call these overrides.
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => updateMetrics(), { once: true });
+  document.addEventListener("DOMContentLoaded", () => {
+    updateMetrics();
+    reconcileIncidentExecutionState(state.incident);
+    reconcileHistoryExecutionState();
+  }, { once: true });
 } else {
   updateMetrics();
+  reconcileIncidentExecutionState(state.incident);
+  reconcileHistoryExecutionState();
 }
