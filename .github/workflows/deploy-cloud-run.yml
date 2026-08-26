@@ -7,9 +7,6 @@ on:
         description: Optional deployment note
         required: false
         default: manual WebMCP deployment
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
