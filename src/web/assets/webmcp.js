@@ -32,9 +32,11 @@
     };
     activity.unshift(entry);
     if (activity.length > 50) activity.length = 50;
+    const previous = window.SentinelOpsWebMCP || {};
     window.SentinelOpsWebMCP = {
+      ...previous,
       version: TOOL_VERSION,
-      tools: REGISTERED_TOOL_NAMES.slice(),
+      tools: Array.isArray(previous.tools) ? previous.tools.slice() : REGISTERED_TOOL_NAMES.slice(),
       activity: activity.slice(),
     };
     window.dispatchEvent(new CustomEvent("sentinelops:webmcp-activity", { detail: entry }));
@@ -314,6 +316,12 @@
       console.info(`[SentinelOps] WebMCP ready: ${tools.length} tools registered.`);
     } catch (error) {
       setStatus("ERROR", "error");
+      window.SentinelOpsWebMCP = {
+        version: TOOL_VERSION,
+        tools: [],
+        activity: activity.slice(),
+        available: false,
+      };
       recordActivity("webmcp", "failed", error?.message || error);
       console.error("[SentinelOps] WebMCP registration failed", error);
     }
