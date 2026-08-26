@@ -1,0 +1,63 @@
+name: Deploy SentinelOps to Cloud Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      revision_note:
+        description: Optional deployment note
+        required: false
+        default: manual WebMCP deployment
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-sentinelops-cloud-run
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: sentinelops-505805
+  GCP_REGION: europe-west1
+  CLOUD_RUN_SERVICE: sentinelops
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Verify target
+        run: |
+          test "${GCP_PROJECT_ID}" = "sentinelops-505805"
+          test "${GCP_REGION}" = "europe-west1"
+          test "${CLOUD_RUN_SERVICE}" = "sentinelops"
+          gcloud config set project "${GCP_PROJECT_ID}"
+          gcloud run services describe "${CLOUD_RUN_SERVICE}" --region "${GCP_REGION}" --format='value(metadata.name)'
+
+      - name: Deploy current commit
+        run: |
+          gcloud run deploy "${CLOUD_RUN_SERVICE}" \
+            --source . \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --allow-unauthenticated \
+            --quiet
+
+      - name: Verify live service
+        run: |
+          SERVICE_URL="$(gcloud run services describe "${CLOUD_RUN_SERVICE}" --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" --format='value(status.url)')"
+          test -n "${SERVICE_URL}"
+          curl --fail --silent --show-error "${SERVICE_URL}/health"
+          echo "Live URL: ${SERVICE_URL}"
