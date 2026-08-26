@@ -1,0 +1,93 @@
+.approval-section {
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.approval-section > :first-child {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.approval-actions {
+  display: flex;
+  flex: 1 1 560px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+  overflow: visible;
+}
+
+.approval-actions > input#approval-comment {
+  flex: 1 1 260px;
+  min-width: 220px;
+  max-width: 100%;
+  margin: 0;
+}
+
+.approval-actions > button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  width: auto;
+  margin: 0;
+  padding: 0 16px;
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+}
+
+#reject-button,
+#approve-button {
+  min-width: 92px;
+}
+
+#execute-button {
+  min-width: 190px;
+}
+
+#verify-button {
+  min-width: 188px;
+}
+
+.approval-actions .execution-targets {
+  flex: 1 0 100%;
+  width: 100%;
+  margin: 0;
+}
+
+.approval-actions .execution-targets input {
+  min-width: 0;
+}
+
+@media (max-width: 1280px) {
+  .approval-section {
+    display: block;
+  }
+
+  .approval-actions {
+    justify-content: flex-start;
+    margin-top: 16px;
+  }
+}
+
+@media (max-width: 700px) {
+  .approval-actions > input#approval-comment {
+    flex-basis: 100%;
+    min-width: 100%;
+  }
+
+  .approval-actions > button {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+  }
+
+  #execute-button,
+  #verify-button {
+    flex-basis: 100%;
+  }
+}
