@@ -7,6 +7,11 @@ on:
         description: Optional deployment note
         required: false
         default: manual WebMCP deployment
+  push:
+    branches:
+      - main
+    paths:
+      - ".deploy-trigger"
 
 permissions:
   contents: read
