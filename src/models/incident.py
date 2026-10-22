@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.models.evidence import EvidenceItem
 
@@ -48,6 +48,8 @@ class VerificationRequest(BaseModel):
 
 
 class HealthVerificationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     url: str = Field(min_length=1, max_length=2000)
     timeout_seconds: float = Field(default=3.0, gt=0, le=30)
     expected_status: int = Field(default=200, ge=100, le=599)

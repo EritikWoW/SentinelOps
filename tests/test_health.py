@@ -36,11 +36,11 @@ def test_readiness_contract_is_safe() -> None:
 
 
 def test_mutating_control_plane_requires_configured_token(monkeypatch) -> None:
-    monkeypatch.setenv("SENTINELOPS_API_TOKEN", "test-token")
+    monkeypatch.setenv("SENTINELOPS_API_TOKEN", "a-strong-control-token-1234")
     monkeypatch.setenv("SENTINELOPS_AUTH_REQUIRED", "true")
     payload = {"node_id": "auth-test", "hostname": "host", "platform": "windows"}
     assert client.post("/nodes/heartbeat", json=payload).status_code == 401
-    authorized = client.post("/nodes/heartbeat", json=payload, headers={"X-SentinelOps-Token": "test-token"})
+    authorized = client.post("/nodes/heartbeat", json=payload, headers={"X-SentinelOps-Token": "a-strong-control-token-1234"})
     assert authorized.status_code == 200
 
 
@@ -409,7 +409,7 @@ def test_create_incident(monkeypatch) -> None:
 
     verified = client.post(
         f"/incidents/{incident_id}/verify",
-        json={"passed": True, "notes": "Local demo health checks passed."},
+        json={"url": "http://demo/health"},
     )
     assert verified.status_code == 200
     assert verified.json()["analysis"]["verification_status"] == "passed"

@@ -5,12 +5,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import RLock
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
 from src.agents.coordinator import IncidentCoordinator
-from src.models.incident import ApprovalRequest, ExecutionRequest, HealthVerificationRequest, IncidentAnalysis, IncidentCreate, IncidentResponse, VerificationRequest
+from src.auth import require_control_token, validate_security_configuration
+from src.models.incident import ApprovalRequest, ExecutionRequest, HealthVerificationRequest, IncidentAnalysis, IncidentCreate, IncidentResponse
 from src.models.events import EventIngestionResponse, NodeHeartbeat, NodeRecord, NormalizedEvent
 from src.models.settings import SettingsResponse, SettingsUpdate
 from src.services.cloud_run_executor import CloudRunExecutionError, rollback_cloud_run
@@ -19,7 +20,7 @@ from src.services.ingestion import incident_from_event
 from src.services.incident_store import IncidentNotFoundError, build_incident_store
 from src.services.node_registry import NodeRegistry, build_node_registry
 from src.services.pubsub_push import register_pubsub_push
-from src.services.verification import verify_health
+from src.services.verification import approved_health_url, verify_health
 from src.policy.safety import SafetyPolicy
 from src.services.runtime_settings import current_settings, save_settings
 
@@ -31,19 +32,6 @@ event_consumer: EventConsumer = build_event_consumer()
 node_registry: NodeRegistry = build_node_registry()
 safety_policy = SafetyPolicy()
 _detector_correlation_lock = RLock()
-
-
-def require_control_token(x_sentinelops_token: str | None = Header(default=None)) -> None:
-    """Protect mutating control-plane routes when deployment auth is enabled."""
-
-    configured = os.getenv("SENTINELOPS_API_TOKEN", "")
-    required = os.getenv("SENTINELOPS_AUTH_REQUIRED", "false").strip().lower() == "true"
-    if not configured and not required:
-        return
-    if not configured:
-        raise HTTPException(status_code=503, detail="Control-plane authentication is not configured")
-    if x_sentinelops_token != configured:
-        raise HTTPException(status_code=401, detail="A valid X-SentinelOps-Token is required")
 
 
 def _correlation_window_seconds() -> int:
@@ -112,6 +100,7 @@ def _handle_external_event(raw_payload: dict[str, object]) -> None:
 async def lifespan(_app: FastAPI):
     """Start pull ingestion only when explicitly selected for local/worker deployments."""
 
+    validate_security_configuration()
     delivery_mode = os.getenv("PUBSUB_DELIVERY_MODE", "pull").strip().lower()
     if delivery_mode == "pull":
         event_consumer.start(_handle_external_event)
@@ -179,7 +168,7 @@ def readiness() -> dict[str, object]:
 
 
 @app.get("/settings", response_model=SettingsResponse)
-def get_settings() -> SettingsResponse:
+def get_settings(_: None = Depends(require_control_token)) -> SettingsResponse:
     """Return safe operational settings without exposing credentials."""
 
     return current_settings()
@@ -193,12 +182,12 @@ def node_heartbeat(payload: NodeHeartbeat, _: None = Depends(require_control_tok
 
 
 @app.get("/nodes", response_model=list[NodeRecord])
-def list_nodes() -> list[NodeRecord]:
+def list_nodes(_: None = Depends(require_control_token)) -> list[NodeRecord]:
     return node_registry.list()
 
 
 @app.get("/nodes/{node_id}", response_model=NodeRecord)
-def get_node(node_id: str) -> NodeRecord:
+def get_node(node_id: str, _: None = Depends(require_control_token)) -> NodeRecord:
     node = node_registry.get(node_id)
     if node is None:
         raise HTTPException(status_code=404, detail="Node not found")
@@ -206,7 +195,7 @@ def get_node(node_id: str) -> NodeRecord:
 
 
 @app.get("/incidents", response_model=list[IncidentResponse])
-def list_incidents(limit: int = 25) -> list[IncidentResponse]:
+def list_incidents(limit: int = 25, _: None = Depends(require_control_token)) -> list[IncidentResponse]:
     """Return recent incidents for the command-center history panel."""
 
     return incident_store.list(limit)
@@ -216,11 +205,13 @@ def list_incidents(limit: int = 25) -> list[IncidentResponse]:
 def update_settings(payload: SettingsUpdate, _: None = Depends(require_control_token)) -> SettingsResponse:
     """Persist non-secret settings; a process restart applies backend changes."""
 
+    if os.getenv("SENTINELOPS_ENV", "development").strip().lower() in {"production", "staging"}:
+        raise HTTPException(status_code=403, detail="Runtime configuration is deployment-managed")
     return save_settings(payload, os.getenv("SENTINELOPS_ENV_FILE", ".env"))
 
 
 @app.get("/events")
-def list_events(limit: int = 50) -> list[dict[str, object]]:
+def list_events(limit: int = 50, _: None = Depends(require_control_token)) -> list[dict[str, object]]:
     """Return recent local events for debugging and workflow observability."""
 
     return [event.model_dump(mode="json") for event in event_publisher.recent(limit)]
@@ -296,7 +287,7 @@ def create_incident(payload: IncidentCreate, _: None = Depends(require_control_t
 
 
 @app.get("/incidents/{incident_id}", response_model=IncidentResponse)
-def get_incident(incident_id: str) -> IncidentResponse:
+def get_incident(incident_id: str, _: None = Depends(require_control_token)) -> IncidentResponse:
     try:
         return incident_store.get(incident_id)
     except IncidentNotFoundError as exc:
@@ -348,26 +339,16 @@ def execute_incident_remediation(incident_id: str, payload: ExecutionRequest, _:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@app.post("/incidents/{incident_id}/verify", response_model=IncidentResponse)
-def verify_incident_remediation(incident_id: str, payload: VerificationRequest, _: None = Depends(require_control_token)) -> IncidentResponse:
+def _verified_health_transition(incident_id: str, payload: HealthVerificationRequest) -> IncidentResponse:
+    """Only server-observed health evidence may finalize a recovery."""
     try:
-        updated = incident_store.verify(incident_id, payload.passed, payload.notes)
-        if payload.passed and updated.node_id:
-            node_registry.record_resolution(updated.node_id)
-        event_publisher.publish("incident.remediation_verified", updated.model_dump(mode="json"))
-        return updated
-    except IncidentNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Incident not found") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-
-@app.post("/incidents/{incident_id}/verify/health", response_model=IncidentResponse)
-def verify_incident_health(incident_id: str, payload: HealthVerificationRequest, _: None = Depends(require_control_token)) -> IncidentResponse:
-    """Verify recovery against a real health endpoint before resolving."""
-
-    result = verify_health(payload.url, payload.timeout_seconds, payload.expected_status)
-    try:
+        incident = incident_store.get(incident_id)
+        if incident.analysis is None or incident.analysis.remediation_status != "executed":
+            raise ValueError("Remediation must be executed before verification")
+        if incident.analysis.verification_status != "pending":
+            raise ValueError("Incident verification is already complete")
+        target = approved_health_url(incident.service, payload.url)
+        result = verify_health(target, payload.timeout_seconds, payload.expected_status)
         updated = incident_store.verify(incident_id, result["passed"], result["notes"])
         if result["passed"] and updated.node_id:
             node_registry.record_resolution(updated.node_id)
@@ -377,3 +358,18 @@ def verify_incident_health(incident_id: str, payload: HealthVerificationRequest,
         raise HTTPException(status_code=404, detail="Incident not found") from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/incidents/{incident_id}/verify", response_model=IncidentResponse)
+def verify_incident_remediation(
+    incident_id: str, payload: HealthVerificationRequest, _: None = Depends(require_control_token)
+) -> IncidentResponse:
+    """Legacy route retained, but caller-supplied success is never accepted."""
+    return _verified_health_transition(incident_id, payload)
+
+
+@app.post("/incidents/{incident_id}/verify/health", response_model=IncidentResponse)
+def verify_incident_health(
+    incident_id: str, payload: HealthVerificationRequest, _: None = Depends(require_control_token)
+) -> IncidentResponse:
+    return _verified_health_transition(incident_id, payload)
